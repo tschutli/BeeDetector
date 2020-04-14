@@ -97,7 +97,7 @@ def convert_annotation_folders(input_folders, test_splits, validation_splits, pr
         
         
         print("")
-        print("Tiling images (and annotations) into chunks suitable for Tensorflow training: (" + input_folder + ")")
+        print("Changing image resolution and filtering annotations: (" + input_folder + ")")
         sys.stdout.flush()
         
         
@@ -111,8 +111,10 @@ def convert_annotation_folders(input_folders, test_splits, validation_splits, pr
             
             #copying the image along with annotations to the train directory
             dest_image_path = os.path.join(train_images_dir,"inputdir" + str(input_folder_index) + "_" + os.path.basename(image_path))
+            resize_image(image_path,dest_image_path,annotations,tensorflow_tile_size)
+            
+            
             dest_xml_path = dest_image_path[:-4] + ".xml"
-            shutil.copyfile(image_path,dest_image_path)
 
             dest_annotations_xml = build_xml_tree(annotations,dest_image_path)
             dest_annotations_xml.write(dest_xml_path)
@@ -158,6 +160,34 @@ def convert_annotation_folders(input_folders, test_splits, validation_splits, pr
     print(str(len(labels)) + " classes used for training.")
     print("Done!")
 
+
+def resize_image(image_path,dest_image_path,annotations,size=None):
+    
+    image = Image.open(image_path)
+    width, height = image.size
+    if not size: 
+        (dest_width,dest_height) = (width, height)
+    else:
+        (dest_width,dest_height) = size
+
+    
+    x_resize_ratio = width/dest_width
+    y_resize_ratio = height/dest_height
+    
+    image = image.resize(size, Image.ANTIALIAS)
+    
+    for annotation in annotations:
+        [top,left,bottom,right] = annotation["bounding_box"]
+        top = int(top*y_resize_ratio)
+        bottom = int(bottom*y_resize_ratio)
+        left = int(left*x_resize_ratio)
+        right = int(right*x_resize_ratio)
+        annotation["bounding_box"] = [top,left,bottom,right]
+    image.save(dest_image_path)
+
+    
+
+    
 
 def filter_annotations(annotations,labels):
     for annotation in annotations:
