@@ -171,8 +171,8 @@ def resize_image(image_path,dest_image_path,annotations,size=None):
         (dest_width,dest_height) = size
 
     
-    x_resize_ratio = width/dest_width
-    y_resize_ratio = height/dest_height
+    x_resize_ratio = dest_width/width
+    y_resize_ratio = dest_height/height
     
     image = image.resize(size, Image.ANTIALIAS)
     
