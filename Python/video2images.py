@@ -128,7 +128,10 @@ def extract_frames_parallel(video_path,output_folder,out_size=(3840,2160),skip_f
 
 
 if __name__ == '__main__':
-    extract_frames_parallel("C:/Users/johan/Desktop/MVI_0003.MP4","D:/Frames",(3840,2160),2)
-    #make_annotation_frames("D:/MVI_0003.MP4","C:/Users/johan/Desktop/test")
-    #get_frames_every_ms("D:/MVI_0003.MP4","C:/Users/johan/Desktop/test",every_ms=1000,out_size=(640,480))
+    input_video = "C:/Users/johan/Desktop/MVI_0003.MP4"
+    output_folder = "D:/Frames"
+    output_frame_size = (3840,2160)
+    skip_frames = 2
+    
+    extract_frames_parallel(input_video,output_folder,output_frame_size,skip_frames)
     
