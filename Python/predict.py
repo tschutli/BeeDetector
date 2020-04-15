@@ -32,7 +32,7 @@ if StrictVersion(tf.__version__) < StrictVersion('1.9.0'):
 from object_detection.utils import label_map_util
 
 
-def predict(project_dir,images_to_predict,output_folder,tile_size,prediction_overlap,min_confidence_score=0.5,visualize_predictions=True,visualize_groundtruths=False, visualize_scores=False, visualize_names=False, max_iou=0.3):
+def predict(project_dir,images_to_predict,output_folder,tile_size,min_confidence_score=0.5,visualize_predictions=True,visualize_groundtruths=False, visualize_scores=False, visualize_names=False, max_iou=0.3):
   """
   Makes predictions on all images in the images_to_predict folder and saves them to the
   output_folder with the prediction bounding boxes drawn onto the images. Additionally
