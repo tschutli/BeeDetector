@@ -137,9 +137,14 @@ def visualize(input_video,detection_map,output_path):
                 bottom = int(bottom*image_size[1])
                 left = int(left*image_size[0])
                 right = int(right*image_size[0])
-                
-                image = cv2.rectangle(image, (left,top), (right,bottom), (255,0,0), 2)
-        
+                if(detection["detection_class"] == 0):
+                    image = cv2.rectangle(image, (left,top), (right,bottom), (0,255,0), 2)
+                elif(detection["detection_class"] == 1):
+                    image = cv2.rectangle(image, (left,top), (right,bottom), (255,0,0), 2)
+                else:
+                    image = cv2.rectangle(image, (left,top), (right,bottom), (0,0,255), 2)
+
+                    
         out.write(image)
         
         
@@ -185,7 +190,8 @@ def get_detections(sess,image, image_tensor, tensor_dict):
             left = output_dict['detection_boxes'][i][1]
             bottom = output_dict['detection_boxes'][i][2]
             right = output_dict['detection_boxes'][i][3]
-            detections.append({"bounding_box": [top,left,bottom,right], "score": float(score)})
+            detection_class = output_dict['detection_classes'][i]
+            detections.append({"bounding_box": [top,left,bottom,right], "score": float(score), "class": detection_class})
     return detections
     #print("9: " + str(current_milli_time()-start))
     #print()
