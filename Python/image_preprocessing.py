@@ -192,8 +192,9 @@ def resize_image(image_path,dest_image_path,annotations,size=None):
 def filter_annotations(annotations,labels):
     for annotation in annotations:
         #Remove all spaces and numbers from annotation name
-        filtered_name = ''.join(x for x in annotation["name"] if x.isalpha())
+        filtered_name = ''.join(x for x in annotation["name"] if not x.isdigit())
         annotation["name"] = filtered_name
+        print(filtered_name)
         
         
         add_label_to_labelcount(filtered_name, labels)

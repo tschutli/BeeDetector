@@ -92,7 +92,7 @@ def predict(project_dir,images_to_predict,output_folder,tile_size,min_confidence
         output_dict = sess.run(tensor_dict,feed_dict={image_tensor: np.expand_dims(image_np, 0)})
         
         output_dict = clean_output_dict(output_dict)
-                
+        
 
         count = 0
         for i,score in enumerate(output_dict['detection_scores']):
@@ -242,7 +242,7 @@ def get_tensor_dict(tile_size):
     detection_boxes = tf.slice(detection_boxes, [0, 0], [real_num_detection, -1])
     detection_masks = tf.slice(detection_masks, [0, 0, 0], [real_num_detection, -1, -1])
     detection_masks_reframed = utils_ops.reframe_box_masks_to_image_masks(
-        detection_masks, detection_boxes, tile_size, tile_size)
+        detection_masks, detection_boxes, tile_size[1], tile_size[0])
     detection_masks_reframed = tf.cast(
         tf.greater(detection_masks_reframed, 0.5), tf.uint8)
     # Follow the convention by adding back the batch dimension
