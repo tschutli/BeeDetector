@@ -137,9 +137,9 @@ def visualize(input_video,detection_map,output_path):
                 bottom = int(bottom*image_size[1])
                 left = int(left*image_size[0])
                 right = int(right*image_size[0])
-                if(detection["detection_class"] == 0):
+                if(detection["class"] == 0):
                     image = cv2.rectangle(image, (left,top), (right,bottom), (0,255,0), 2)
-                elif(detection["detection_class"] == 1):
+                elif(detection["class"] == 1):
                     image = cv2.rectangle(image, (left,top), (right,bottom), (255,0,0), 2)
                 else:
                     image = cv2.rectangle(image, (left,top), (right,bottom), (0,0,255), 2)
