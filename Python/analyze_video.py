@@ -18,6 +18,8 @@ import os
 current_milli_time = lambda: int(round(time.time() * 1000))
 
 
+MAX_SQUARED_DISTANCE = 0.01
+
 image_size = constants.tensorflow_tile_size
 #image_size = (1000,750)
 min_confidence_score = 0.5
@@ -97,7 +99,7 @@ def detect_bees(trained_bee_model,input_video,working_dir):
                 else:
                     skip_counter = -1
                 
-            
+            enumerate_detections(detection_map)
             visualize(input_video,detection_map,"C:/Users/johan/Desktop/test.MP4")
 
             
@@ -122,6 +124,51 @@ def detect_bees(trained_bee_model,input_video,working_dir):
                     detections.append({"bounding_box": [top,left,bottom,right], "score": float(score)})
             '''
 
+
+
+
+def enumerate_detections(detection_map):
+    
+    current_bee_index = 0
+    frame_number = 0
+    while frame_number in detection_map:
+        
+        if detection_map[frame_number] and detection_map[frame_number] != "Skipped":
+            
+            prev_detections = []
+            if frame_number > 0:
+                prev_detections = detection_map[frame_number-1]
+                
+                
+            for detection in detection_map[frame_number]:
+                if prev_detections == [] or prev_detections == "Skipped":
+                    detection["id"] = current_bee_index
+                    current_bee_index += 1
+                else:
+                    [top,left,bottom,right] = detection["bounding_box"]
+                    (x, y) = ((right+left)/2,(bottom-top)/2)
+                    
+                    distances = []
+                    
+                    for prev_index,prev_detection in enumerate(prev_detections):
+                        [top,left,bottom,right] = prev_detection["bounding_box"]
+                        (prev_x, prev_y) = ((right+left)/2,(bottom-top)/2)
+                        squared_distance = pow(x-prev_x,2) + pow(y-prev_y,2)
+                        distances.append({"distance": squared_distance, "index": prev_index})
+                        #print("{:.2e}".format(squared_distance))
+                    
+                    distances = sorted(distances, key = lambda i: i['distance']) 
+                    
+                    if distances[0]["distance"] < MAX_SQUARED_DISTANCE and (len(distances) < 2 or distances[1]["distance"] > MAX_SQUARED_DISTANCE):
+                        #there was only one bee close in the previous image. Give it the same id!
+                        detection["id"] = prev_detections[distances[0]["index"]]["id"]
+                    else:
+                        detection["id"] = current_bee_index
+                        current_bee_index += 1
+                    
+        
+        frame_number += 1
+    
 
 def crop_out_detections(image, frame_number, detections, output_dir):
     
@@ -175,7 +222,7 @@ def visualize(input_video,detection_map,output_path):
                     
                 image = cv2.rectangle(image, (left,top), (right,bottom), rectangle_color, 2)
                 
-                cv2.putText(image, '{0:.2f}'.format(detection["score"]), (left, top-10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, rectangle_color, 1)
+                cv2.putText(image, str(detection["id"]), (left, top-10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, rectangle_color, 2)
                 
                     
         out.write(image)
