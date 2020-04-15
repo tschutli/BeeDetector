@@ -16,14 +16,10 @@ from utils import constants
 import os
 #os.environ["CUDA_VISIBLE_DEVICES"] = '-1'
 from utils import file_utils
-from utils import flower_info
 import numpy as np
 import sys
 import tensorflow as tf
 from object_detection.utils import visualization_utils
-import progressbar
-import gdal
-from utils import eval_utils
 
 
 from distutils.version import StrictVersion
@@ -83,54 +79,36 @@ def predict(project_dir,images_to_predict,output_folder,tile_size,prediction_ove
     for image_path in all_images:
         
         image = Image.open(image_path)
-        width, height = image.size
+        original_width, original_height = image.size
 
         print("Making Predictions for " + os.path.basename(image_path) + "...")
         
         detections = []
         
+        resized_image = image.resize(tile_size, Image.ANTIALIAS)
         
-        image_np = load_image_into_numpy_array(cropped_im)
+        image_np = load_image_into_numpy_array(resized_image)
         
-        image = image.resize((basewidth,hsize), Image.ANTIALIAS)
-
+        output_dict = sess.run(tensor_dict,feed_dict={image_tensor: np.expand_dims(image_np, 0)})
         
-        #create appropriate tiles from image
-        for x_start in progressbar.progressbar(range(-prediction_overlap, width-1,tile_size-2*prediction_overlap)):
-            for y_start in range(-prediction_overlap,height-1,tile_size-2*prediction_overlap):
-                
-                crop_rectangle = (x_start, y_start, x_start+tile_size, y_start + tile_size)
-                cropped_im = image.crop(crop_rectangle)                
-                
-                cropped_im = cropped_im.convert("RGB")
-                #check if image consists of only one color.
-                extrema = cropped_im.convert("L").getextrema()
-                if extrema[0] == extrema[1]:
-                    continue
-                #cropped_im.save("G:/Johannes/test/" + os.path.basename(image_path)[:-4] + "_" + str(x_start) + "_" + str(y_start) + ".png")
-                image_np = load_image_into_numpy_array(cropped_im)
-                output_dict = sess.run(tensor_dict,feed_dict={image_tensor: np.expand_dims(image_np, 0)})
-                output_dict = clean_output_dict(output_dict)
+        output_dict = clean_output_dict(output_dict)
                 
 
-                core_overlap = int(prediction_overlap * 0.2)
-                count = 0
-                for i,score in enumerate(output_dict['detection_scores']):
-                    center_x = (output_dict['detection_boxes'][i][3]+output_dict['detection_boxes'][i][1])/2*tile_size
-                    center_y = (output_dict['detection_boxes'][i][2]+output_dict['detection_boxes'][i][0])/2*tile_size
-                    if score >= min_confidence_score and center_x >= prediction_overlap-core_overlap and center_y >= prediction_overlap-core_overlap and center_x < tile_size-prediction_overlap+core_overlap and center_y < tile_size-prediction_overlap+core_overlap:
-                        count += 1
-                        top = round(output_dict['detection_boxes'][i][0] * tile_size + y_start)
-                        left = round(output_dict['detection_boxes'][i][1] * tile_size + x_start)
-                        bottom = round(output_dict['detection_boxes'][i][2] * tile_size + y_start)
-                        right = round(output_dict['detection_boxes'][i][3] * tile_size + x_start)
-                        detection_class = output_dict['detection_classes'][i]
-                        detections.append({"bounding_box": [top,left,bottom,right], "score": float(score), "name": category_index[detection_class]["name"]})
-                #detections.append({"bounding_box": [y_start+25,x_start+25,y_start+tile_size-25,x_start+tile_size-25], "score": float(0.9), "name": "tile"})
+        count = 0
+        for i,score in enumerate(output_dict['detection_scores']):
+            if score >= min_confidence_score:
+                count += 1
+                top = round(output_dict['detection_boxes'][i][0] * original_height)
+                left = round(output_dict['detection_boxes'][i][1] * original_width)
+                bottom = round(output_dict['detection_boxes'][i][2] * original_height)
+                right = round(output_dict['detection_boxes'][i][3] * original_width)
+                detection_class = output_dict['detection_classes'][i]
+                detections.append({"bounding_box": [top,left,bottom,right], "score": float(score), "name": category_index[detection_class]["name"]})
                         
-        detections = eval_utils.non_max_suppression(detections,max_iou)
+        #detections = eval_utils.non_max_suppression(detections,max_iou)
         
-        print(str(len(detections)) + " flowers detected")
+        print(str(len(detections)) + " objects detected")
+        
         predictions_out_path = os.path.join(output_folder, os.path.basename(image_path)[:-4] + "_predictions.json")
         file_utils.save_json_file(detections,predictions_out_path)
 
@@ -150,7 +128,7 @@ def predict(project_dir,images_to_predict,output_folder,tile_size,prediction_ove
 
         for detection in detections:
             if visualize_predictions:
-                col = flower_info.get_color_for_flower(detection["name"])
+                col = 'LightCyan'
                 [top,left,bottom,right] = detection["bounding_box"]
                 score_string = str('{0:.2f}'.format(detection["score"]))
                 vis_string_list = []
@@ -166,34 +144,6 @@ def predict(project_dir,images_to_predict,output_folder,tile_size,prediction_ove
 
 
 
-def draw_bounding_box_onto_array(array,top,left,bottom,right,color=[0,0,0]):
-    """
-
-    Parameters:
-        image_path (str): path to the image of which the annotations should be read
-    
-    Returns:
-        list: a list containing all annotations corresponding to that image.
-            Returns the None if no annotation file is present
-    """
-
-    try:
-        color = np.array(color).astype(np.uint8)
-        top = max(0,int(top))
-        left = max(0,int(left))
-        bottom = min(array.shape[0]-1,int(bottom))
-        right = min(array.shape[1]-1,int(right))
-        for i in range(top,bottom+1,1):
-            array[i,left] = color
-            array[i,right] = color
-        for i in range(left,right+1):
-            array[top,i] = color
-            array[bottom,i] = color
-
-    except IndexError:
-        print("Index error: " + str((top, left, bottom, right)))
-
-
         
 def get_ground_truth_annotations(image_path):
     """Reads the ground_thruth information from either the tablet annotations (imagename_annotations.json),
@@ -207,10 +157,11 @@ def get_ground_truth_annotations(image_path):
             Returns the None if no annotation file is present
     """
     ground_truth = file_utils.get_annotations(image_path)
+    '''
     for fl in ground_truth:
         fl["name"] = flower_info.clean_string(fl["name"])
         fl["bounding_box"] = flower_info.get_bbox(fl)
-    
+    '''
     if len(ground_truth) == 0:                     
         return None
     return ground_truth

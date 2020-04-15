@@ -289,7 +289,7 @@ def get_precision_and_recall_from_stat(stat):
 
 
 if __name__ == '__main__':
-    project_dir = constants.project_dir
+    project_dir = constants.project_folder
     max_steps = constants.max_steps
     
     train_with_validation(project_dir,max_steps)
