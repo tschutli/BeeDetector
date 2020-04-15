@@ -74,7 +74,7 @@ def predict(project_dir,images_to_predict,output_folder,tile_size,prediction_ove
        
     tensor_dict = get_tensor_dict(tile_size)
     image_tensor = tf.get_default_graph().get_tensor_by_name('image_tensor:0') 
-    all_images = file_utils.get_all_images_in_folder(images_to_predict)
+    all_images = file_utils.get_all_image_paths_in_folder(images_to_predict)
     
     for image_path in all_images:
         
