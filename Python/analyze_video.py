@@ -90,12 +90,9 @@ def detect_bees(trained_bee_model,input_video,working_dir):
                 else:
                     skip_counter = -1
                 
-                if detections:
-                    print("detection at frame " + str(frame_number), flush=True)
-                    print("seconds: " + str(frame_number/25), flush= True)
-                    print()
             
-            
+            visualize(input_video,detection_map,"C:/Users/johan/Desktop/test.MP4")
+
             '''
             #Prediction part
             image_np = load_image_into_numpy_array(image)
@@ -117,6 +114,39 @@ def detect_bees(trained_bee_model,input_video,working_dir):
 
 
 
+def visualize(input_video,detection_map,output_path):
+    
+    cap = cv2.VideoCapture(input_video)
+            
+    out = cv2.VideoWriter(output_path,cv2.VideoWriter_fourcc(*'MP4V'), 25, image_size)
+
+    no_of_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    
+    for frame_number in progressbar.progressbar(range(0,no_of_frames)):
+            
+        ret, image = cap.read()
+        if not ret:
+            break
+        
+        image = cv2.resize(image, image_size)
+        
+        if detection_map[frame_number] and detection_map[frame_number] != "Skipped":
+            for detection in detection_map[frame_number]:
+                [top,left,bottom,right] = detection["bounding_box"]
+                top = int(top*image_size[1])
+                bottom = int(bottom*image_size[1])
+                left = int(left*image_size[0])
+                right = int(right*image_size[0])
+                
+                image = cv2.rectangle(image, (left,top), (right,bottom), (255,0,0), 2)
+        
+        out.write(image)
+        
+        
+    out.release()
+    
+        
+        
 
 def get_detections(sess,image, image_tensor, tensor_dict):
     #print("3: " + str(current_milli_time()-start))
@@ -250,7 +280,7 @@ def clean_output_dict(output_dict):
 if __name__== "__main__":
     
     bee_model_path = "C:/Users/johan/Desktop/Agroscope_working_dir/trained_inference_graphs/output_inference_graph_v1.pb/frozen_inference_graph.pb"
-    input_video = "C:/Users/johan/Desktop/MVI_0003.MP4"
+    input_video = "C:/Users/johan/Desktop/MVI_0003_Trim2.MP4"
     working_dir = "C:/Users/johan/Desktop/test"
     analyze_video(bee_model_path, "", input_video,working_dir)
     
