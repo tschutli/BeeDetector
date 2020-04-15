@@ -57,7 +57,7 @@ def evaluate(project_folder, input_folder, output_folder,iou_threshold=constants
     for flower_name in flower_names:
         stats[flower_name] = {"tp": 0, "fp": 0, "fn": 0, "mAP": 0}
 
-    images = file_utils.get_all_images_in_folder(input_folder)
+    images = file_utils.get_all_image_paths_in_folder(input_folder)
 
     for i in progressbar.progressbar(range(len(images))):
         image_path = images[i]
