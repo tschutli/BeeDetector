@@ -13,6 +13,7 @@ import cv2
 import progressbar
 import time
 from PIL import Image
+import os
 
 current_milli_time = lambda: int(round(time.time() * 1000))
 
@@ -56,12 +57,13 @@ def detect_bees(trained_bee_model,input_video,working_dir):
             #while frame_number < no_of_frames:
                 #start = current_milli_time()
                     
-                ret, image = cap.read()
+                ret, original_image = cap.read()
                 if not ret:
                     break
                 
-                image = cv2.resize(image, image_size)
-                last_24_frames[frame_number%24] = image
+                last_24_frames[frame_number%24] = original_image
+
+                image = cv2.resize(original_image, image_size)
                 
                 #Skip frame if previously no bee was detected:
                 if skip_counter>=0 and skip_counter < 12:
@@ -75,15 +77,20 @@ def detect_bees(trained_bee_model,input_video,working_dir):
                 detections = get_detections(sess,image,image_tensor,tensor_dict)
                 detection_map[frame_number] = detections
                 
+                crop_out_detections(original_image,frame_number,detections,working_dir)
+                
+                
                 if not detections:
                     skip_counter = 0
                 elif skip_counter == 12:
                     skip_counter = -1
                     
                     for i in range(1,13):
-                        image = last_24_frames[(frame_number-i)%24]
+                        original_image = last_24_frames[(frame_number-i)%24]
+                        image = cv2.resize(original_image, image_size)
                         detections = get_detections(sess, image, image_tensor, tensor_dict)
                         detection_map[frame_number-i] = detections
+                        crop_out_detections(original_image,frame_number-i,detections,working_dir)
                         if not detections:
                             break
                                
@@ -92,6 +99,9 @@ def detect_bees(trained_bee_model,input_video,working_dir):
                 
             
             visualize(input_video,detection_map,"C:/Users/johan/Desktop/test.MP4")
+
+            
+
 
             '''
             #Prediction part
@@ -111,6 +121,26 @@ def detect_bees(trained_bee_model,input_video,working_dir):
                     right = round(output_dict['detection_boxes'][i][3] * original_width)
                     detections.append({"bounding_box": [top,left,bottom,right], "score": float(score)})
             '''
+
+
+def crop_out_detections(image, frame_number, detections, output_dir):
+    
+    #saving cropped out detections:
+    for index,detection in enumerate(detections):
+        
+        bee_tile_path = os.path.join(working_dir,"frame" + str(frame_number) + "_detection" + str(index) + ".png")
+        
+        height, width = image.shape[:2]
+
+        [top,left,bottom,right] = detection["bounding_box"]
+        top = int(top*height)
+        bottom = int(bottom*height)
+        left = int(left*width)
+        right = int(right*width)
+        
+        bee_tile = image[top:bottom,left:right]
+        
+        cv2.imwrite(bee_tile_path, bee_tile)
 
 
 
@@ -137,13 +167,16 @@ def visualize(input_video,detection_map,output_path):
                 bottom = int(bottom*image_size[1])
                 left = int(left*image_size[0])
                 right = int(right*image_size[0])
+                rectangle_color = (0,0,255)
                 if(detection["class"] == 0):
-                    image = cv2.rectangle(image, (left,top), (right,bottom), (0,255,0), 2)
+                    rectangle_color = (0,255,0)
                 elif(detection["class"] == 1):
-                    image = cv2.rectangle(image, (left,top), (right,bottom), (255,0,0), 2)
-                else:
-                    image = cv2.rectangle(image, (left,top), (right,bottom), (0,0,255), 2)
-
+                    rectangle_color = (255,0,0)      
+                    
+                image = cv2.rectangle(image, (left,top), (right,bottom), rectangle_color, 2)
+                
+                cv2.putText(image, '{0:.2f}'.format(detection["score"]), (left, top-10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, rectangle_color, 1)
+                
                     
         out.write(image)
         
