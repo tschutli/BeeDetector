@@ -15,7 +15,7 @@ import time
 from PIL import Image
 import os
 from utils import eval_utils
-
+import pickle
 current_milli_time = lambda: int(round(time.time() * 1000))
 
 
@@ -102,6 +102,8 @@ def detect_bees(trained_bee_model,input_video,working_dir):
                     skip_counter = -1
                 
                 
+            with open(os.path.join(working_dir,"detection_map.pkl"), 'wb') as f:
+                pickle.dump(detection_map,f)
 
             enumerate_detections(detection_map)
             visualize(input_video,detection_map,os.path.join(working_dir,"test.MP4"))
