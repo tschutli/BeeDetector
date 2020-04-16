@@ -14,6 +14,7 @@ import progressbar
 import time
 from PIL import Image
 import os
+from utils import eval_utils
 
 current_milli_time = lambda: int(round(time.time() * 1000))
 
@@ -77,6 +78,7 @@ def detect_bees(trained_bee_model,input_video,working_dir):
                 
                  
                 detections = get_detections(sess,image,image_tensor,tensor_dict)
+                
                 detection_map[frame_number] = detections
                 
                 crop_out_detections(original_image,frame_number,detections,working_dir)
@@ -99,8 +101,10 @@ def detect_bees(trained_bee_model,input_video,working_dir):
                 else:
                     skip_counter = -1
                 
+                
+
             enumerate_detections(detection_map)
-            visualize(input_video,detection_map,"C:/Users/johan/Desktop/test.MP4")
+            visualize(input_video,detection_map,os.path.join(working_dir,"test.MP4"))
 
             
 
@@ -128,6 +132,8 @@ def detect_bees(trained_bee_model,input_video,working_dir):
 
 
 def enumerate_detections(detection_map):
+    
+    #TODO: Make sure that bees are kept being tracked even if for one or two frames the object detection algorithm didn't detect them
     
     current_bee_index = 0
     frame_number = 0
@@ -166,6 +172,18 @@ def enumerate_detections(detection_map):
                         detection["id"] = current_bee_index
                         current_bee_index += 1
                     
+            #Making sure that one detection in the previous frame did not split into two detections in the current frame
+            assigned_ids = []
+            for detection in detection_map[frame_number]:
+                if not detection["id"] in assigned_ids:
+                    assigned_ids.append(detection["id"])
+                else:
+                    print("Two objects very close to each other causing confusion at frame: " + str(frame_number))
+                    detection_map[frame_number][assigned_ids.index(detection["id"])] = current_bee_index
+                    assigned_ids.append(detection["id"])
+                    detection["id"] = current_bee_index + 1
+                    current_bee_index += 2
+
         
         frame_number += 1
     
@@ -272,6 +290,9 @@ def get_detections(sess,image, image_tensor, tensor_dict):
             right = output_dict['detection_boxes'][i][3]
             detection_class = output_dict['detection_classes'][i]
             detections.append({"bounding_box": [top,left,bottom,right], "score": float(score), "class": detection_class})
+    
+    detections = eval_utils.non_max_suppression(detections,0.5)
+
     return detections
     #print("9: " + str(current_milli_time()-start))
     #print()
