@@ -16,6 +16,9 @@ from PIL import Image
 import os
 from utils import eval_utils
 import pickle
+import queue
+import threading
+
 current_milli_time = lambda: int(round(time.time() * 1000))
 
 
@@ -33,6 +36,17 @@ def analyze_video(trained_bee_model, trained_hole_model, input_video, working_di
     
     
     
+def thread_fill_queue(queue,input_video):
+    cap = cv2.VideoCapture(input_video)
+    ret, original_image = cap.read()
+    while ret:
+        queue.put(original_image)
+        ret, original_image = cap.read()
+        print("qsize: " + str(queue.qsize()))
+
+
+    
+    
     
 def detect_bees(trained_bee_model,input_video,working_dir):
 
@@ -45,7 +59,7 @@ def detect_bees(trained_bee_model,input_video,working_dir):
     detection_graph = get_detection_graph(trained_bee_model)
     with detection_graph.as_default():
         with tf.Session() as sess:
-            '''
+            
             tensor_dict = get_tensor_dict(image_size)
             image_tensor = tf.get_default_graph().get_tensor_by_name('image_tensor:0') 
             
@@ -53,39 +67,63 @@ def detect_bees(trained_bee_model,input_video,working_dir):
             cap = cv2.VideoCapture(input_video)
             
             no_of_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-            fps = int(cap.get(cv2.CAP_PROP_FPS))
+            #fps = int(cap.get(cv2.CAP_PROP_FPS))
             
             #frame_number = 0
+            
+            frame_queue = queue.Queue(100)
+            enqueue_thread = threading.Thread(target=thread_fill_queue,args=(frame_queue,input_video,))
+            enqueue_thread.daemon=True
+            enqueue_thread.start()
+            
             
             
             
             for frame_number in progressbar.progressbar(range(0,no_of_frames)):
             #while frame_number < no_of_frames:
-                #start = current_milli_time()
+                start = current_milli_time()
                     
+                print("",flush=True)
+                '''
                 ret, original_image = cap.read()
                 if not ret:
                     break
+                '''
+                original_image = frame_queue.get()
+                #print(frame_queue.qsize())
+                
+                print("1: " + str(current_milli_time()-start), flush=True)
                 
                 last_24_frames[frame_number%24] = original_image
+                
+                print("2: " + str(current_milli_time()-start), flush=True)
 
                 image = cv2.resize(original_image, image_size)
                 
+                print("3: " + str(current_milli_time()-start), flush=True)
+
                 #Skip frame if previously no bee was detected:
                 if skip_counter>=0 and skip_counter < 12:
                     skip_counter += 1
                     detection_map[frame_number] = "Skipped"
                     continue                    
                 
-                
+                print("4: " + str(current_milli_time()-start), flush=True)
+
                 
                  
                 detections = get_detections(sess,image,image_tensor,tensor_dict)
                 
+                print("5: " + str(current_milli_time()-start), flush=True)
+
                 detection_map[frame_number] = detections
                 
+                print("6: " + str(current_milli_time()-start), flush=True)
+
                 crop_out_detections(original_image,frame_number,detections,working_dir)
                 
+                print("7: " + str(current_milli_time()-start), flush=True)
+
                 
                 if not detections:
                     skip_counter = 0
@@ -107,8 +145,9 @@ def detect_bees(trained_bee_model,input_video,working_dir):
                 
             with open(os.path.join(working_dir,"detection_map.pkl"), 'wb') as f:
                 pickle.dump(detection_map,f)
-            '''
-            
+
+
+            return            
             
             
             with open(os.path.join(working_dir,"detection_map.pkl"), 'rb') as f:
@@ -433,7 +472,7 @@ def clean_output_dict(output_dict):
 if __name__== "__main__":
     
     bee_model_path = "C:/Users/johan/Desktop/Agroscope_working_dir/trained_inference_graphs/output_inference_graph_v1.pb/frozen_inference_graph.pb"
-    input_video = "C:/Users/johan/Desktop/test.MP4"
+    input_video = "C:/Users/johan/Desktop/MVI_0003.MP4"
     working_dir = "C:/Users/johan/Desktop/test"
     analyze_video(bee_model_path, "", input_video,working_dir)
     
