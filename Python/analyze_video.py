@@ -22,8 +22,10 @@ current_milli_time = lambda: int(round(time.time() * 1000))
 MAX_SQUARED_DISTANCE = 0.01
 
 image_size = constants.tensorflow_tile_size
-#image_size = (1000,750)
+image_size = (1000,750)
 min_confidence_score = 0.5
+min_consecutive_frames_to_be_counted = 3
+
 
 def analyze_video(trained_bee_model, trained_hole_model, input_video, working_dir):
     
@@ -43,6 +45,7 @@ def detect_bees(trained_bee_model,input_video,working_dir):
     detection_graph = get_detection_graph(trained_bee_model)
     with detection_graph.as_default():
         with tf.Session() as sess:
+            '''
             tensor_dict = get_tensor_dict(image_size)
             image_tensor = tf.get_default_graph().get_tensor_by_name('image_tensor:0') 
             
@@ -104,6 +107,13 @@ def detect_bees(trained_bee_model,input_video,working_dir):
                 
             with open(os.path.join(working_dir,"detection_map.pkl"), 'wb') as f:
                 pickle.dump(detection_map,f)
+            '''
+            
+            
+            
+            with open(os.path.join(working_dir,"detection_map.pkl"), 'rb') as f:
+            
+                detection_map = pickle.load(f)
 
             enumerate_detections(detection_map)
             visualize(input_video,detection_map,os.path.join(working_dir,"test.MP4"))
@@ -136,6 +146,8 @@ def detect_bees(trained_bee_model,input_video,working_dir):
 def enumerate_detections(detection_map):
     
     #TODO: Make sure that bees are kept being tracked even if for one or two frames the object detection algorithm didn't detect them
+    
+    bee_id_count = {}
     
     current_bee_index = 0
     frame_number = 0
@@ -185,8 +197,27 @@ def enumerate_detections(detection_map):
                     assigned_ids.append(detection["id"])
                     detection["id"] = current_bee_index + 1
                     current_bee_index += 2
+            
+            #Updating bee_id_count with detections in current frame
+            for detection in detection_map[frame_number]:
+                if not detection["id"] in bee_id_count:
+                    bee_id_count[detection["id"]] = 1
+                else:
+                    bee_id_count[detection["id"]] += 1
 
+
+        frame_number += 1
         
+    
+    assigned_ids = {}
+        
+    frame_number = 0
+    #Clean up, remove all detections that are only one frame long  
+    while frame_number in detection_map:
+        if detection_map[frame_number] and detection_map[frame_number] != "Skipped":
+            for detection in detection_map[frame_number]:
+                if bee_id_count[detection["id"]] < min_consecutive_frames_to_be_counted:
+                    detection["id"] = -1
         frame_number += 1
     
 
@@ -212,41 +243,54 @@ def crop_out_detections(image, frame_number, detections, output_dir):
 
 
 def visualize(input_video,detection_map,output_path):
-    
+    start = current_milli_time()
     cap = cv2.VideoCapture(input_video)
             
+
     out = cv2.VideoWriter(output_path,cv2.VideoWriter_fourcc(*'MP4V'), 25, image_size)
 
     no_of_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     
     for frame_number in progressbar.progressbar(range(0,no_of_frames)):
             
+        start = current_milli_time()
+
+
         ret, image = cap.read()
         if not ret:
             break
+        #print("",flush=True)
         
+        #print("1: " + str(current_milli_time()-start))
+
         image = cv2.resize(image, image_size)
+        #print("2: " + str(current_milli_time()-start), flush=True)
+        
         
         if detection_map[frame_number] and detection_map[frame_number] != "Skipped":
             for detection in detection_map[frame_number]:
-                [top,left,bottom,right] = detection["bounding_box"]
-                top = int(top*image_size[1])
-                bottom = int(bottom*image_size[1])
-                left = int(left*image_size[0])
-                right = int(right*image_size[0])
-                rectangle_color = (0,0,255)
-                if(detection["class"] == 0):
-                    rectangle_color = (0,255,0)
-                elif(detection["class"] == 1):
-                    rectangle_color = (255,0,0)      
+                if detection["id"] != -1:
+                    [top,left,bottom,right] = detection["bounding_box"]
+                    top = int(top*image_size[1])
+                    bottom = int(bottom*image_size[1])
+                    left = int(left*image_size[0])
+                    right = int(right*image_size[0])
+                    rectangle_color = (0,0,255)
+                    if(detection["class"] == 0):
+                        rectangle_color = (0,255,0)
+                    elif(detection["class"] == 1):
+                        rectangle_color = (255,0,0)      
                     
-                image = cv2.rectangle(image, (left,top), (right,bottom), rectangle_color, 2)
-                
-                cv2.putText(image, str(detection["id"]), (left, top-10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, rectangle_color, 2)
-                
+                    image = cv2.rectangle(image, (left,top), (right,bottom), rectangle_color, 2)
                     
-        out.write(image)
+                    cv2.putText(image, str(detection["id"]) + " / " + '{0:.2f}'.format(detection["score"]), (left, top-10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, rectangle_color, 2)
         
+        #print("3: " + str(current_milli_time()-start), flush=True)
+        if detection_map[frame_number] != "Skipped":
+            out.write(image)
+        #print("4: " + str(current_milli_time()-start), flush=True)
+        #print("", flush=True)
+
         
     out.release()
     
@@ -389,7 +433,7 @@ def clean_output_dict(output_dict):
 if __name__== "__main__":
     
     bee_model_path = "C:/Users/johan/Desktop/Agroscope_working_dir/trained_inference_graphs/output_inference_graph_v1.pb/frozen_inference_graph.pb"
-    input_video = "C:/Users/johan/Desktop/MVI_0003_Trim2.MP4"
+    input_video = "C:/Users/johan/Desktop/test.MP4"
     working_dir = "C:/Users/johan/Desktop/test"
     analyze_video(bee_model_path, "", input_video,working_dir)
     
