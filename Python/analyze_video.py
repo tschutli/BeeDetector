@@ -55,7 +55,7 @@ def thread_fill_queue(queue,input_video):
 def detect_bees(trained_bee_model,input_video,working_dir):
 
     num_threads = 3
-    frame_queue = queue.Queue(100)
+    frame_queue = queue.PriorityQueue(100)
     
     worker_threads = []
 

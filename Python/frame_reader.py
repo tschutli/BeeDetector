@@ -50,7 +50,7 @@ def start(thread_id, num_processes, video_path, queue, working_dir, image_size=(
 
         resized_image = cv2.resize(original_image, image_size)
         
-        detections = get_detections(resized_image,queue)
+        detections = get_detections(resized_image,frame_number-start_frame,queue)
         
         
         
@@ -67,7 +67,7 @@ def start(thread_id, num_processes, video_path, queue, working_dir, image_size=(
                     break
                 original_image = last_24_frames[(frame_number-i)%24]
                 resized_image = cv2.resize(original_image, image_size)
-                detections = get_detections(resized_image,queue)
+                detections = get_detections(resized_image,frame_number-i-start_frame,queue)
                 detection_map[frame_number-i] = detections
                 crop_out_detections(original_image,frame_number-i,detections,working_dir)
                 if not detections:
@@ -119,7 +119,7 @@ def crop_out_detections(image, frame_number, detections, output_dir):
         cv2.imwrite(bee_tile_path, bee_tile)
 
 
-def get_detections(resized_image,queue,min_confidence_score = 0.5):
+def get_detections(resized_image,queue,priority,min_confidence_score = 0.5):
     image = cv2.cvtColor(resized_image, cv2.COLOR_BGR2RGB)
     image = Image.fromarray(image)
     image_np = np.asarray(image)         
@@ -127,7 +127,7 @@ def get_detections(resized_image,queue,min_confidence_score = 0.5):
     is_done = Event()
     detections_dict = {}
 
-    queue.put((image_expand,detections_dict,is_done))
+    queue.put((priority, (image_expand,detections_dict,is_done)))
     is_done.wait()
     
     

@@ -8,12 +8,17 @@ import tensorflow as tf
 from object_detection.utils import ops as utils_ops
 import numpy as np
 import time
+import statistics
+import queue
 
 current_milli_time = lambda: int(round(time.time() * 1000))
 
 
-def start(trained_model,queue,image_size,stop_event):
+def start(trained_model,frame_queue,image_size,stop_event):
     
+    stats = []
+    stats_wait = []
+
     
     detection_graph = get_detection_graph(trained_model)
     with detection_graph.as_default():
@@ -25,20 +30,28 @@ def start(trained_model,queue,image_size,stop_event):
 
             while not stop_event.is_set():
                 start = current_milli_time()
-                
-                (image_expand,detections,is_done) = queue.get(timeout = 3)
-                
-                #print("wait: " + str(current_milli_time()-start), flush=True)
-                start = current_milli_time()
-
-                out_dict = sess.run(tensor_dict,feed_dict={image_tensor: image_expand})
-                clean_pred_dict(out_dict,detections)
-                is_done.set()
-                
-                print("done: " + str(current_milli_time()-start), flush=True)
-
-                
+                try:
+                    (image_expand,detections,is_done) = frame_queue.get(timeout = 3)
+                    
+                    stats_wait.append(current_milli_time()-start)
     
+                    #print("wait: " + str(current_milli_time()-start), flush=True)
+                    start = current_milli_time()
+    
+                    out_dict = sess.run(tensor_dict,feed_dict={image_tensor: image_expand})
+                    clean_pred_dict(out_dict,detections)
+                    is_done.set()
+                    stats.append(current_milli_time()-start)
+                    #print("done: " + str(current_milli_time()-start), flush=True)
+                    if len(stats)%10 == 0:
+                        print("median_predict: " + str(statistics.median(stats)))
+                        print("median_wait: " + str(statistics.median(stats_wait)))
+                
+                except queue.Empty:
+                    continue
+                    
+                
+            print("Quitting prediction Thread")
 
 
 
