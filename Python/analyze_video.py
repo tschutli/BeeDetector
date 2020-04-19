@@ -16,71 +16,67 @@ import threading
 import frame_reader
 import predictor
 from threading import Event
+from concurrent.futures import ThreadPoolExecutor
 
 
 current_milli_time = lambda: int(round(time.time() * 1000))
 
 
-MAX_SQUARED_DISTANCE = 0.01
 
 image_size = constants.tensorflow_tile_size
 #image_size = (1000,750)
 min_confidence_score = 0.5
-min_consecutive_frames_to_be_counted = 3
 num_threads = 7
 
 
-def analyze_video(trained_bee_model, trained_hole_model, input_video, working_dir):
+def analyze_videos(trained_bee_model, trained_hole_model, input_videos, working_dir):
     
-    detect_bees(trained_bee_model,input_video,working_dir)
+    working_dirs = []
+    for input_video in input_videos:
+        video_dir = os.path.join(working_dir, os.path.basename(input_video))
+        while video_dir in working_dirs:
+            video_dir += "2"
+        working_dirs.append(video_dir)
+        os.makedirs(video_dir,exist_ok=True)
+          
+    detect_bees(trained_bee_model,input_videos,working_dirs)
     
     
     
     
     
-def detect_bees(trained_bee_model,input_video,working_dir):
-    '''
-    start = current_milli_time()
+    
+def detect_bees(trained_bee_model,input_videos,working_dirs):
+    
+        
+    #start = current_milli_time()
     
     frame_queue = queue.PriorityQueue()
-    
-    worker_threads = []
-    results = [{}] * num_threads
-
-    for thread_id in range(num_threads):
         
-        enqueue_thread = threading.Thread(target=frame_reader.start,args=(thread_id, num_threads, input_video, frame_queue, working_dir,results[thread_id],image_size,))
-        enqueue_thread.daemon=True
-        worker_threads.append(enqueue_thread)
-        enqueue_thread.start()
-
-    
-    predictor_stop_event = Event()
-    predictor_thread = threading.Thread(target=predictor.start,args=(trained_bee_model,frame_queue,image_size,predictor_stop_event,))
-    predictor_thread.daemon=True
-    predictor_thread.start()
-
-    detection_map = {}
-    
-    for worker_thread in worker_threads:
-        worker_thread.join()
-    predictor_stop_event.set()
-    
-    for result in results:
-        detection_map.update(result)
-
+    with ThreadPoolExecutor(max_workers=num_threads) as executor:
+        futures = []
+        for (input_video,working_dir) in zip(input_videos,working_dirs):
+            if os.isfile(os.path.join(working_dir,"detection_map.pkl")):
+                continue
+            future = executor.submit(frame_reader.start, input_video, frame_queue, working_dir,image_size)
+            futures.append(future)
+        
+        
+        predictor_stop_event = Event()
+        predictor_thread = threading.Thread(target=predictor.start,args=(trained_bee_model,frame_queue,image_size,predictor_stop_event,))
+        predictor_thread.daemon=True
+        predictor_thread.start()
+        
+        for future in futures:
+            future.result()
+        predictor_stop_event.set()
+        
 
         
-    
-    print("Total Prediction Time: " + str(current_milli_time()-start))
-    
-    with open(os.path.join(working_dir,"detection_map.pkl"), 'wb') as f:
-        pickle.dump(detection_map,f)
-    '''
-    
+    return
+
     detection_map = {}
     with open(os.path.join(working_dir,"detection_map.pkl"), 'rb') as f:
-    
         detection_map = pickle.load(f)
 
 
@@ -104,91 +100,10 @@ def detect_bees(trained_bee_model,input_video,working_dir):
     print(count)
     
 
-    enumerate_detections(detection_map)
+    #enumerate_detections(detection_map)
     visualize(input_video,detection_map,os.path.join(working_dir,"test.MP4"))
     
             
-
-
-
-
-
-def enumerate_detections(detection_map):
-    
-    #TODO: Make sure that bees are kept being tracked even if for one or two frames the object detection algorithm didn't detect them
-    
-    bee_id_count = {}
-    
-    current_bee_index = 0
-    frame_number = 0
-    while frame_number in detection_map:
-        
-        if detection_map[frame_number] and detection_map[frame_number] != "Skipped":
-            
-            prev_detections = []
-            if frame_number > 0:
-                prev_detections = detection_map[frame_number-1]
-                
-                
-            for detection in detection_map[frame_number]:
-                if prev_detections == [] or prev_detections == "Skipped":
-                    detection["id"] = current_bee_index
-                    current_bee_index += 1
-                else:
-                    [top,left,bottom,right] = detection["bounding_box"]
-                    (x, y) = ((right+left)/2,(bottom-top)/2)
-                    
-                    distances = []
-                    
-                    for prev_index,prev_detection in enumerate(prev_detections):
-                        [top,left,bottom,right] = prev_detection["bounding_box"]
-                        (prev_x, prev_y) = ((right+left)/2,(bottom-top)/2)
-                        squared_distance = pow(x-prev_x,2) + pow(y-prev_y,2)
-                        distances.append({"distance": squared_distance, "index": prev_index})
-                        #print("{:.2e}".format(squared_distance))
-                    
-                    distances = sorted(distances, key = lambda i: i['distance']) 
-                    
-                    if distances[0]["distance"] < MAX_SQUARED_DISTANCE and (len(distances) < 2 or distances[1]["distance"] > MAX_SQUARED_DISTANCE):
-                        #there was only one bee close in the previous image. Give it the same id!
-                        detection["id"] = prev_detections[distances[0]["index"]]["id"]
-                    else:
-                        detection["id"] = current_bee_index
-                        current_bee_index += 1
-                    
-            #Making sure that one detection in the previous frame did not split into two detections in the current frame
-            assigned_ids = []
-            for detection in detection_map[frame_number]:
-                if not detection["id"] in assigned_ids:
-                    assigned_ids.append(detection["id"])
-                else:
-                    print("Two objects very close to each other causing confusion at frame: " + str(frame_number))
-                    detection_map[frame_number][assigned_ids.index(detection["id"])] = current_bee_index
-                    assigned_ids.append(detection["id"])
-                    detection["id"] = current_bee_index + 1
-                    current_bee_index += 2
-            
-            #Updating bee_id_count with detections in current frame
-            for detection in detection_map[frame_number]:
-                if not detection["id"] in bee_id_count:
-                    bee_id_count[detection["id"]] = 1
-                else:
-                    bee_id_count[detection["id"]] += 1
-
-
-        frame_number += 1
-        
-    
-    assigned_ids = {}
-        
-    frame_number = 0
-    #Clean up, remove all detections that are only one frame long  
-    while frame_number in detection_map:
-        if detection_map[frame_number] and detection_map[frame_number] != "Skipped":
-            for detection in detection_map[frame_number]:
-                if bee_id_count[detection["id"]] < min_consecutive_frames_to_be_counted:
-                    detection["id"] = -1
-        frame_number += 1
     
 
 
@@ -276,9 +191,9 @@ def visualize(input_video,detection_map,output_path):
 
 if __name__== "__main__":
     
-    bee_model_path = "G:/Johannes/Test/Working_dir_3/trained_inference_graphs/output_inference_graph_v1.pb/frozen_inference_graph.pb"
-    input_video = "G:/Johannes/Test/MVI_0003.MP4"
-    working_dir = "G:/Johannes/Test/test"
-    analyze_video(bee_model_path, "", input_video,working_dir)
+    bee_model_path = "C:/Users/johan/Desktop/Agroscope_working_dir/trained_inference_graphs/output_inference_graph_v1.pb/frozen_inference_graph.pb"
+    input_videos = ["C:/Users/johan/Desktop/test.MP4","C:/Users/johan/Desktop/MVI_0003_Trim.mp4"]
+    working_dir = "C:/Users/johan/Desktop/test"
+    analyze_videos(bee_model_path, "", input_videos, working_dir)
     
     

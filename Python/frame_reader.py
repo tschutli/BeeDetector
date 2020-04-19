@@ -13,6 +13,12 @@ import os
 from utils import eval_utils
 from dataclasses import dataclass, field
 from typing import Any
+import pickle
+
+
+MAX_SQUARED_DISTANCE = 0.01
+min_consecutive_frames_to_be_counted = 3
+
 
 
 @dataclass(order=True)
@@ -21,25 +27,29 @@ class PrioritizedItem:
     item: Any=field(compare=False)
 
 
-def start(thread_id, num_processes, video_path, queue, working_dir, detection_map, image_size=(640,480)):
+def start(video_path, queue, working_dir, image_size=(640,480)):
     
+    detection_map = {}
+    #TODO: Load existing detection_map
     
     last_24_frames = [None] * 24
     skip_counter = -1
 
     
-    
+    detected_bees_store_path = os.path.join(working_dir,"detected_bees")
+    os.makedirs(detected_bees_store_path,exist_ok=True)
     cap = cv2.VideoCapture(video_path)
     no_of_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))  
     print("Number of frames: " + str(no_of_frames))
-    start_frame = int(no_of_frames / num_processes)* thread_id
-    end_frame = int(no_of_frames / num_processes)* (thread_id+1)
-    cap.set(cv2.CAP_PROP_POS_FRAMES, start_frame)
+    #start_frame = int(no_of_frames / num_processes)* thread_id
+    #end_frame = int(no_of_frames / num_processes)* (thread_id+1)
+    #cap.set(cv2.CAP_PROP_POS_FRAMES, start_frame)
     
-    for frame_number in range(start_frame,end_frame):
+    #for frame_number in range(start_frame,end_frame):
+    for frame_number in range(0,no_of_frames):
         
-        if (frame_number-start_frame) % 100 == 0:
-            print("Thread " + str(thread_id) + " progress: " + str(frame_number-start_frame) + " / " + str(end_frame-start_frame))
+        if (frame_number) % 100 == 0:
+            print(os.path.basename(video_path) + " progress: " + str(frame_number) + " / " + str(no_of_frames))
 
         cap_frame_number = cap.get(cv2.CAP_PROP_POS_FRAMES)
         if cap_frame_number != frame_number:
@@ -65,11 +75,11 @@ def start(thread_id, num_processes, video_path, queue, working_dir, detection_ma
 
         resized_image = cv2.resize(original_image, image_size)
         
-        detections = get_detections(resized_image,queue,frame_number-start_frame)
+        detections = get_detections(resized_image,queue,frame_number)
         
         detection_map[frame_number] = detections
         
-        crop_out_detections(original_image,frame_number,detections,working_dir)
+        crop_out_detections(original_image,frame_number,detections,detected_bees_store_path)
 
         
         if not detections:
@@ -78,11 +88,11 @@ def start(thread_id, num_processes, video_path, queue, working_dir, detection_ma
             skip_counter = -1
             
             for i in range(1,13):
-                if frame_number-i < start_frame:
+                if frame_number-i < 0:
                     break
                 original_image = last_24_frames[(frame_number-i)%24]
                 resized_image = cv2.resize(original_image, image_size)
-                detections = get_detections(resized_image,queue,frame_number-i-start_frame)
+                detections = get_detections(resized_image,queue,frame_number-i)
                 detection_map[frame_number-i] = detections
                 crop_out_detections(original_image,frame_number-i,detections,working_dir)
                 if not detections:
@@ -91,20 +101,97 @@ def start(thread_id, num_processes, video_path, queue, working_dir, detection_ma
         else:
             skip_counter = -1
             
-
-            #print("qsize: " + str(queue.qsize()))
-
             
             
+    enumerate_detections(detection_map)
+
+    with open(os.path.join(working_dir,"detection_map.pkl"), 'wb') as f:
+        pickle.dump(detection_map,f)
 
     # Release resources
     cap.release()
-    print("Thread " + str(thread_id) + ": DONE!")
+    print(os.path.basename(video_path) + ": DONE!")
 
     
 
 
 
+def enumerate_detections(detection_map):
+    
+    #TODO: Make sure that bees are kept being tracked even if for one or two frames the object detection algorithm didn't detect them
+    
+    bee_id_count = {}
+    
+    current_bee_index = 0
+    frame_number = 0
+    while frame_number in detection_map:
+        
+        if detection_map[frame_number] and detection_map[frame_number] != "Skipped":
+            
+            prev_detections = []
+            if frame_number > 0:
+                prev_detections = detection_map[frame_number-1]
+                
+                
+            for detection in detection_map[frame_number]:
+                if prev_detections == [] or prev_detections == "Skipped":
+                    detection["id"] = current_bee_index
+                    current_bee_index += 1
+                else:
+                    [top,left,bottom,right] = detection["bounding_box"]
+                    (x, y) = ((right+left)/2,(bottom-top)/2)
+                    
+                    distances = []
+                    
+                    for prev_index,prev_detection in enumerate(prev_detections):
+                        [top,left,bottom,right] = prev_detection["bounding_box"]
+                        (prev_x, prev_y) = ((right+left)/2,(bottom-top)/2)
+                        squared_distance = pow(x-prev_x,2) + pow(y-prev_y,2)
+                        distances.append({"distance": squared_distance, "index": prev_index})
+                        #print("{:.2e}".format(squared_distance))
+                    
+                    distances = sorted(distances, key = lambda i: i['distance']) 
+                    
+                    if distances[0]["distance"] < MAX_SQUARED_DISTANCE and (len(distances) < 2 or distances[1]["distance"] > MAX_SQUARED_DISTANCE):
+                        #there was only one bee close in the previous image. Give it the same id!
+                        detection["id"] = prev_detections[distances[0]["index"]]["id"]
+                    else:
+                        detection["id"] = current_bee_index
+                        current_bee_index += 1
+                    
+            #Making sure that one detection in the previous frame did not split into two detections in the current frame
+            assigned_ids = []
+            for detection in detection_map[frame_number]:
+                if not detection["id"] in assigned_ids:
+                    assigned_ids.append(detection["id"])
+                else:
+                    print("Two objects very close to each other causing confusion at frame: " + str(frame_number))
+                    detection_map[frame_number][assigned_ids.index(detection["id"])] = current_bee_index
+                    assigned_ids.append(detection["id"])
+                    detection["id"] = current_bee_index + 1
+                    current_bee_index += 2
+            
+            #Updating bee_id_count with detections in current frame
+            for detection in detection_map[frame_number]:
+                if not detection["id"] in bee_id_count:
+                    bee_id_count[detection["id"]] = 1
+                else:
+                    bee_id_count[detection["id"]] += 1
+
+
+        frame_number += 1
+        
+    
+    assigned_ids = {}
+        
+    frame_number = 0
+    #Clean up, remove all detections that are only one frame long  
+    while frame_number in detection_map:
+        if detection_map[frame_number] and detection_map[frame_number] != "Skipped":
+            for detection in detection_map[frame_number]:
+                if bee_id_count[detection["id"]] < min_consecutive_frames_to_be_counted:
+                    detection["id"] = -1
+        frame_number += 1
 
 
 
@@ -140,7 +227,9 @@ def get_detections(resized_image,queue,priority,min_confidence_score = 0.5):
     image_expand = np.expand_dims(image_np, 0)
     is_done = Event()
     detections_dict = {}
-    queue_item = PrioritizedItem(priority,(image_expand,detections_dict,is_done))
+    if priority == 0:
+        priority = 1
+    queue_item = PrioritizedItem(1/priority,(image_expand,detections_dict,is_done))
     queue.put(queue_item)
     is_done.wait()
     
