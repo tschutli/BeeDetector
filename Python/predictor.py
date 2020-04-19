@@ -51,7 +51,7 @@ def start(trained_model,frame_queue,image_size,stop_event):
                     is_done.set()
                     stats.append(current_milli_time()-start)
                     #print("done: " + str(current_milli_time()-start), flush=True)
-                    if len(stats)%10 == 0:
+                    if len(stats)%100 == 0:
                         print("median_predict: " + str(statistics.median(stats)))
                         print("median_wait: " + str(statistics.median(stats_wait)))
                 

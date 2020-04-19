@@ -27,6 +27,7 @@ image_size = constants.tensorflow_tile_size
 #image_size = (1000,750)
 min_confidence_score = 0.5
 min_consecutive_frames_to_be_counted = 3
+num_threads = 7
 
 
 def analyze_video(trained_bee_model, trained_hole_model, input_video, working_dir):
@@ -38,10 +39,9 @@ def analyze_video(trained_bee_model, trained_hole_model, input_video, working_di
     
     
 def detect_bees(trained_bee_model,input_video,working_dir):
-    
+    '''
     start = current_milli_time()
     
-    num_threads = 7
     frame_queue = queue.PriorityQueue()
     
     worker_threads = []
@@ -64,26 +64,49 @@ def detect_bees(trained_bee_model,input_video,working_dir):
     
     for worker_thread in worker_threads:
         worker_thread.join()
+    predictor_stop_event.set()
+    
     for result in results:
         detection_map.update(result)
 
+
         
-    predictor_stop_event.set()
     
     print("Total Prediction Time: " + str(current_milli_time()-start))
     
     with open(os.path.join(working_dir,"detection_map.pkl"), 'wb') as f:
         pickle.dump(detection_map,f)
-
-    return
-
+    '''
+    
+    detection_map = {}
     with open(os.path.join(working_dir,"detection_map.pkl"), 'rb') as f:
     
         detection_map = pickle.load(f)
 
+
+    print(len(detection_map.keys()))
+    
+    count = 0
+    fps = 25
+    
+    '''
+    for frame_number in range(0,19404):
+        if frame_number in detection_map.keys() and detection_map[frame_number] == "Skipped":
+           count += 1
+        
+        if detection_map[frame_number] and detection_map[frame_number] != "Skipped":
+            
+            minutes = str(int(frame_number/fps/60)).zfill(3)
+            seconds = str(int(frame_number/fps) % 60).zfill(2)
+            frame = str(frame_number % fps).zfill(2)
+            print(minutes + ":" + seconds + "." + frame)
+    '''
+    print(count)
+    
+
     enumerate_detections(detection_map)
     visualize(input_video,detection_map,os.path.join(working_dir,"test.MP4"))
-
+    
             
 
 
@@ -170,53 +193,78 @@ def enumerate_detections(detection_map):
 
 
 def visualize(input_video,detection_map,output_path):
-    start = current_milli_time()
-    cap = cv2.VideoCapture(input_video)
-            
+    #start = current_milli_time()
+    #cap = cv2.VideoCapture(input_video)
+    #cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
 
     out = cv2.VideoWriter(output_path,cv2.VideoWriter_fourcc(*'MP4V'), 25, image_size)
 
-    no_of_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    fps = 25
     
-    for frame_number in progressbar.progressbar(range(0,no_of_frames)):
+
+    for thread_id in range(num_threads):
+        
+        cap = cv2.VideoCapture(input_video)
+
+        no_of_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+
+        start_frame = int(no_of_frames / num_threads)* thread_id
+        end_frame = int(no_of_frames / num_threads)* (thread_id+1)
+        cap.set(cv2.CAP_PROP_POS_FRAMES, start_frame)
+
+        for frame_number in progressbar.progressbar(range(start_frame,end_frame)):
+    
+        
+        #for frame_number in progressbar.progressbar(range(0,no_of_frames)):
+                
+            start = current_milli_time()
+            cap_frame_number = cap.get(cv2.CAP_PROP_POS_FRAMES)
+            if cap_frame_number != frame_number:
+                print("ERROR")
+                print(cap_frame_number)
+                print(frame_number)
+                time.sleep(1)
+    
+            ret, image = cap.read()
+            if not ret:
+                print("BREAK")
+                break
+            #print("",flush=True)
             
-        start = current_milli_time()
-
-
-        ret, image = cap.read()
-        if not ret:
-            break
-        #print("",flush=True)
-        
-        #print("1: " + str(current_milli_time()-start))
-
-        image = cv2.resize(image, image_size)
-        #print("2: " + str(current_milli_time()-start), flush=True)
-        
-        
-        if detection_map[frame_number] and detection_map[frame_number] != "Skipped":
-            for detection in detection_map[frame_number]:
-                if detection["id"] != -1:
-                    [top,left,bottom,right] = detection["bounding_box"]
-                    top = int(top*image_size[1])
-                    bottom = int(bottom*image_size[1])
-                    left = int(left*image_size[0])
-                    right = int(right*image_size[0])
-                    rectangle_color = (0,0,255)
-                    if(detection["class"] == 0):
-                        rectangle_color = (0,255,0)
-                    elif(detection["class"] == 1):
-                        rectangle_color = (255,0,0)      
-                    
-                    image = cv2.rectangle(image, (left,top), (right,bottom), rectangle_color, 2)
-                    
-                    cv2.putText(image, str(detection["id"]) + " / " + '{0:.2f}'.format(detection["score"]), (left, top-10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, rectangle_color, 2)
-        
-        #print("3: " + str(current_milli_time()-start), flush=True)
-        if detection_map[frame_number] != "Skipped":
+            #print("1: " + str(current_milli_time()-start))
+    
+            image = cv2.resize(image, image_size)
+            #print("2: " + str(current_milli_time()-start), flush=True)
+            
+            
+            if detection_map[frame_number] and detection_map[frame_number] != "Skipped":
+                for detection in detection_map[frame_number]:
+                    if detection["id"] != -1:
+                        [top,left,bottom,right] = detection["bounding_box"]
+                        top = int(top*image_size[1])
+                        bottom = int(bottom*image_size[1])
+                        left = int(left*image_size[0])
+                        right = int(right*image_size[0])
+                        rectangle_color = (0,0,255)
+                        if(detection["class"] == 0):
+                            rectangle_color = (0,255,0)
+                        elif(detection["class"] == 1):
+                            rectangle_color = (255,0,0)      
+                        
+                        image = cv2.rectangle(image, (left,top), (right,bottom), rectangle_color, 2)
+                        
+                        cv2.putText(image, str(detection["id"]) + " / " + '{0:.2f}'.format(detection["score"]), (left, top-10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, rectangle_color, 2)
+                        minutes = str(int(frame_number/fps/60)).zfill(3)
+                        seconds = str(int(frame_number/fps) % 60).zfill(2)
+                        frame = str(frame_number % fps).zfill(2)
+                        print(minutes + ":" + seconds)
+                        
+    
+            #print("3: " + str(current_milli_time()-start), flush=True)
+            #if detection_map[frame_number] != "Skipped":
             out.write(image)
-        #print("4: " + str(current_milli_time()-start), flush=True)
-        #print("", flush=True)
+            #print("4: " + str(current_milli_time()-start), flush=True)
+            #print("", flush=True)
 
         
     out.release()

@@ -31,6 +31,7 @@ def start(thread_id, num_processes, video_path, queue, working_dir, detection_ma
     
     cap = cv2.VideoCapture(video_path)
     no_of_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))  
+    print("Number of frames: " + str(no_of_frames))
     start_frame = int(no_of_frames / num_processes)* thread_id
     end_frame = int(no_of_frames / num_processes)* (thread_id+1)
     cap.set(cv2.CAP_PROP_POS_FRAMES, start_frame)
@@ -40,10 +41,17 @@ def start(thread_id, num_processes, video_path, queue, working_dir, detection_ma
         if (frame_number-start_frame) % 100 == 0:
             print("Thread " + str(thread_id) + " progress: " + str(frame_number-start_frame) + " / " + str(end_frame-start_frame))
 
-        
+        cap_frame_number = cap.get(cv2.CAP_PROP_POS_FRAMES)
+        if cap_frame_number != frame_number:
+            print("ERROR")
+            print(cap_frame_number)
+            print(frame_number)
+
+
         
         ret, original_image = cap.read()
         if not ret:
+            print("BREAK")
             break
         
         last_24_frames[frame_number%24] = original_image
@@ -59,7 +67,7 @@ def start(thread_id, num_processes, video_path, queue, working_dir, detection_ma
         
         detections = get_detections(resized_image,queue,frame_number-start_frame)
         
-        
+        detection_map[frame_number] = detections
         
         crop_out_detections(original_image,frame_number,detections,working_dir)
 
