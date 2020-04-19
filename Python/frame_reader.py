@@ -21,10 +21,9 @@ class PrioritizedItem:
     item: Any=field(compare=False)
 
 
-def start(thread_id, num_processes, video_path, queue, working_dir, image_size=(640,480)):
+def start(thread_id, num_processes, video_path, queue, working_dir, detection_map, image_size=(640,480)):
     
     
-    detection_map = {}
     last_24_frames = [None] * 24
     skip_counter = -1
 
@@ -95,7 +94,6 @@ def start(thread_id, num_processes, video_path, queue, working_dir, image_size=(
     print("Thread " + str(thread_id) + ": DONE!")
 
     
-    return detection_map
 
 
 

@@ -5,16 +5,11 @@ Created on Wed Apr 15 12:52:15 2020
 @author: johan
 """
 
-import tensorflow as tf
-import numpy as np
-from object_detection.utils import ops as utils_ops
 from utils import constants
 import cv2
 import progressbar
 import time
-from PIL import Image
 import os
-from utils import eval_utils
 import pickle
 import queue
 import threading
@@ -40,16 +35,6 @@ def analyze_video(trained_bee_model, trained_hole_model, input_video, working_di
     
     
     
-def thread_fill_queue(queue,input_video):
-    cap = cv2.VideoCapture(input_video)
-    ret, original_image = cap.read()
-    while ret:
-        queue.put(original_image)
-        ret, original_image = cap.read()
-        print("qsize: " + str(queue.qsize()))
-
-
-    
     
     
 def detect_bees(trained_bee_model,input_video,working_dir):
@@ -60,10 +45,11 @@ def detect_bees(trained_bee_model,input_video,working_dir):
     frame_queue = queue.PriorityQueue()
     
     worker_threads = []
+    results = [{}] * num_threads
 
     for thread_id in range(num_threads):
         
-        enqueue_thread = threading.Thread(target=frame_reader.start,args=(thread_id, num_threads, input_video, frame_queue, working_dir,image_size,))
+        enqueue_thread = threading.Thread(target=frame_reader.start,args=(thread_id, num_threads, input_video, frame_queue, working_dir,results[thread_id],image_size,))
         enqueue_thread.daemon=True
         worker_threads.append(enqueue_thread)
         enqueue_thread.start()
@@ -74,17 +60,21 @@ def detect_bees(trained_bee_model,input_video,working_dir):
     predictor_thread.daemon=True
     predictor_thread.start()
 
+    detection_map = {}
+    
     for worker_thread in worker_threads:
-        woker_result = worker_thread.join()
-        #TODO merge worker results
+        worker_thread.join()
+    for result in results:
+        detection_map.update(result)
+
         
     predictor_stop_event.set()
     
-    print("Total time: " + str(current_milli_time()-start))
-    print("AAALL DONE")
+    print("Total Prediction Time: " + str(current_milli_time()-start))
     
-         
-        
+    with open(os.path.join(working_dir,"detection_map.pkl"), 'wb') as f:
+        pickle.dump(detection_map,f)
+
     return
 
     with open(os.path.join(working_dir,"detection_map.pkl"), 'rb') as f:
@@ -231,63 +221,6 @@ def visualize(input_video,detection_map,output_path):
         
     out.release()
     
-        
-        
-
-def get_detections(sess,image, image_tensor, tensor_dict):
-    
-    start = current_milli_time()
-
-    print("3: " + str(current_milli_time()-start))
-    #frame_number += 1
-    
-    image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-    print("4: " + str(current_milli_time()-start))
-    image = Image.fromarray(image)
-    
-    print("5: " + str(current_milli_time()-start))
-
-
-    #(im_width, im_height) = image.size
-    
-    image_np = np.asarray(image) 
-    
-    print("5.4: " + str(current_milli_time()-start))
-
-    image_expand = np.expand_dims(image_np, 0)
-    print("6: " + str(current_milli_time()-start))
-
-    output_dict = sess.run(tensor_dict,feed_dict={image_tensor: image_expand})
-    
-    print("7: " + str(current_milli_time()-start))
-
-    output_dict = clean_output_dict(output_dict)
-
-
-    print("8: " + str(current_milli_time()-start))
-
-    #print(image_np.dtype)
-
-    
-    detections = []
-    count = 0
-    for i,score in enumerate(output_dict['detection_scores']):
-        if score >= min_confidence_score:
-            count += 1
-            top = output_dict['detection_boxes'][i][0]
-            left = output_dict['detection_boxes'][i][1]
-            bottom = output_dict['detection_boxes'][i][2]
-            right = output_dict['detection_boxes'][i][3]
-            detection_class = output_dict['detection_classes'][i]
-            detections.append({"bounding_box": [top,left,bottom,right], "score": float(score), "class": detection_class})
-    
-    detections = eval_utils.non_max_suppression(detections,0.5)
-    print("9: " + str(current_milli_time()-start))
-
-    return detections
-    #print("9: " + str(current_milli_time()-start))
-    #print()
-
 
     
 
