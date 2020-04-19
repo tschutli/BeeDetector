@@ -53,9 +53,11 @@ def thread_fill_queue(queue,input_video):
     
     
 def detect_bees(trained_bee_model,input_video,working_dir):
-
-    num_threads = 3
-    frame_queue = queue.PriorityQueue(100)
+    
+    start = current_milli_time()
+    
+    num_threads = 7
+    frame_queue = queue.PriorityQueue()
     
     worker_threads = []
 
@@ -78,6 +80,7 @@ def detect_bees(trained_bee_model,input_video,working_dir):
         
     predictor_stop_event.set()
     
+    print("Total time: " + str(current_milli_time()-start))
     print("AAALL DONE")
     
          
@@ -292,9 +295,9 @@ def get_detections(sess,image, image_tensor, tensor_dict):
 
 if __name__== "__main__":
     
-    bee_model_path = "C:/Users/johan/Desktop/Agroscope_working_dir/trained_inference_graphs/output_inference_graph_v1.pb/frozen_inference_graph.pb"
-    input_video = "C:/Users/johan/Desktop/MVI_0003.MP4"
-    working_dir = "C:/Users/johan/Desktop/test"
+    bee_model_path = "G:/Johannes/Test/Working_dir_3/trained_inference_graphs/output_inference_graph_v1.pb/frozen_inference_graph.pb"
+    input_video = "G:/Johannes/Test/MVI_0003.MP4"
+    working_dir = "G:/Johannes/Test/test"
     analyze_video(bee_model_path, "", input_video,working_dir)
     
     

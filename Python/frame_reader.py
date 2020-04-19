@@ -11,6 +11,14 @@ import numpy as np
 from threading import Event
 import os
 from utils import eval_utils
+from dataclasses import dataclass, field
+from typing import Any
+
+
+@dataclass(order=True)
+class PrioritizedItem:
+    priority: int
+    item: Any=field(compare=False)
 
 
 def start(thread_id, num_processes, video_path, queue, working_dir, image_size=(640,480)):
@@ -50,7 +58,7 @@ def start(thread_id, num_processes, video_path, queue, working_dir, image_size=(
 
         resized_image = cv2.resize(original_image, image_size)
         
-        detections = get_detections(resized_image,frame_number-start_frame,queue)
+        detections = get_detections(resized_image,queue,frame_number-start_frame)
         
         
         
@@ -67,7 +75,7 @@ def start(thread_id, num_processes, video_path, queue, working_dir, image_size=(
                     break
                 original_image = last_24_frames[(frame_number-i)%24]
                 resized_image = cv2.resize(original_image, image_size)
-                detections = get_detections(resized_image,frame_number-i-start_frame,queue)
+                detections = get_detections(resized_image,queue,frame_number-i-start_frame)
                 detection_map[frame_number-i] = detections
                 crop_out_detections(original_image,frame_number-i,detections,working_dir)
                 if not detections:
@@ -126,8 +134,8 @@ def get_detections(resized_image,queue,priority,min_confidence_score = 0.5):
     image_expand = np.expand_dims(image_np, 0)
     is_done = Event()
     detections_dict = {}
-
-    queue.put((priority, (image_expand,detections_dict,is_done)))
+    queue_item = PrioritizedItem(priority,(image_expand,detections_dict,is_done))
+    queue.put(queue_item)
     is_done.wait()
     
     

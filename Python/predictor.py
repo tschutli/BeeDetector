@@ -10,6 +10,14 @@ import numpy as np
 import time
 import statistics
 import queue
+from dataclasses import dataclass, field
+from typing import Any
+
+
+@dataclass(order=True)
+class PrioritizedItem:
+    priority: int
+    item: Any=field(compare=False)
 
 current_milli_time = lambda: int(round(time.time() * 1000))
 
@@ -31,7 +39,7 @@ def start(trained_model,frame_queue,image_size,stop_event):
             while not stop_event.is_set():
                 start = current_milli_time()
                 try:
-                    (image_expand,detections,is_done) = frame_queue.get(timeout = 3)
+                    (image_expand,detections,is_done) = frame_queue.get(timeout = 3).item
                     
                     stats_wait.append(current_milli_time()-start)
     
