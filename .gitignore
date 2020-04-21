@@ -129,3 +129,4 @@ dmypy.json
 .pyre/
 Data/
 Python/utils/constants.py
+Models/

@@ -80,7 +80,7 @@ def start(video_path, queue, working_dir, image_size=(640,480)):
 
         resized_image = cv2.resize(original_image, image_size)
         
-        detections = get_detections(resized_image,queue,frame_number)
+        detections = get_detections(resized_image,queue,1)
         
         detection_map[frame_number] = detections
         
@@ -101,9 +101,9 @@ def start(video_path, queue, working_dir, image_size=(640,480)):
                     break
                 original_image = last_24_frames[(frame_number-i)%24]
                 resized_image = cv2.resize(original_image, image_size)
-                detections = get_detections(resized_image,queue,frame_number-i)
+                detections = get_detections(resized_image,queue,1)
                 detection_map[frame_number-i] = detections
-                crop_out_detections(original_image,frame_number-i,detections,working_dir)
+                crop_out_detections(original_image,frame_number-i,detections,detected_bees_store_path)
                 if not detections:
                     break
                        
@@ -236,8 +236,7 @@ def get_detections(resized_image,queue,priority,min_confidence_score = 0.5):
     image_expand = np.expand_dims(image_np, 0)
     is_done = Event()
     detections_dict = {}
-    if priority == 0:
-        priority = 1
+    
     queue_item = PrioritizedItem(1/priority,(image_expand,detections_dict,is_done))
     queue.put(queue_item)
     is_done.wait()

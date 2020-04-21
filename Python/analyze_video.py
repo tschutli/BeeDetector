@@ -17,6 +17,18 @@ import frame_reader
 import predictor
 from threading import Event
 from concurrent.futures import ThreadPoolExecutor
+from PIL import Image
+import numpy as np
+from dataclasses import dataclass, field
+from typing import Any
+from utils import eval_utils
+from utils import file_utils
+
+
+@dataclass(order=True)
+class PrioritizedItem:
+    priority: int
+    item: Any=field(compare=False)
 
 
 current_milli_time = lambda: int(round(time.time() * 1000))
@@ -40,7 +52,7 @@ def analyze_videos(trained_bee_model, trained_hole_model, input_videos, working_
         os.makedirs(video_dir,exist_ok=True)
           
     detect_bees(trained_bee_model,input_videos,working_dirs)
-    
+    detect_holes(trained_hole_model,input_videos,working_dirs)
     #TODO detect holes
     #TODO detect numbers on bees
     #TODO get statistics
@@ -49,7 +61,70 @@ def analyze_videos(trained_bee_model, trained_hole_model, input_videos, working_
     
 
     
+def detect_holes(trained_hole_model, input_videos, working_dirs):
     
+    frame_queue = queue.PriorityQueue()
+        
+    with ThreadPoolExecutor(max_workers=num_threads) as executor:
+        futures = []
+        for (input_video,working_dir) in zip(input_videos,working_dirs):
+            if os.path.isfile(os.path.join(working_dir,"detected_holes.pkl")):
+                continue
+            future = executor.submit(hole_frame_reader,working_dir,frame_queue,image_size)
+            
+            futures.append(future)
+        
+        
+        predictor_stop_event = Event()
+        predictor_thread = threading.Thread(target=predictor.start,args=(trained_hole_model,frame_queue,image_size,predictor_stop_event,))
+        predictor_thread.daemon=True
+        predictor_thread.start()
+        
+        for future in futures:
+            future.result()
+        predictor_stop_event.set()
+
+
+def hole_frame_reader(working_dir,frame_queue,image_size):
+    hole_images_folder = os.path.join(working_dir,"frames_without_bees")
+    all_images = file_utils.get_all_image_paths_in_folder(hole_images_folder)
+    
+    all_detections = []
+    for image_path in all_images:
+        
+        image = Image.open(image_path)
+        resized_image = image.resize(image_size)
+        image_np = np.asarray(resized_image)         
+        image_expand = np.expand_dims(image_np, 0)
+        is_done = Event()
+        detections_dict = {}
+        
+        queue_item = PrioritizedItem(1,(image_expand,detections_dict,is_done))
+        queue.put(queue_item)
+        is_done.wait()
+        
+        detections = []
+        count = 0
+        for i,score in enumerate(detections_dict['detection_scores']):
+            if score >= min_confidence_score:
+                count += 1
+                top = detections_dict['detection_boxes'][i][0]
+                left = detections_dict['detection_boxes'][i][1]
+                bottom = detections_dict['detection_boxes'][i][2]
+                right = detections_dict['detection_boxes'][i][3]
+                detection_class = detections_dict['detection_classes'][i]
+                detections.append({"bounding_box": [top,left,bottom,right], "score": float(score), "class": detection_class})
+        
+        detections = eval_utils.non_max_suppression(detections,0.5)
+        all_detections.append(detections)
+
+
+    for detections in all_detections:
+        with open(os.path.join(working_dir,"detected_holes.pkl"), 'wb') as f:
+            pickle.dump(detections,f)
+
+        print("num_detections: " + str(len(detections)))
+
     
     
 def detect_bees(trained_bee_model,input_videos,working_dirs):
@@ -172,10 +247,10 @@ def visualize(input_video,detection_map,output_path):
     
 
 
-
 if __name__== "__main__":
     
     bee_model_path = constants.bee_model_path
+    hole_model_path = constants.hole_model_path
     input_videos = constants.input_videos
     working_dir = constants.working_dir
     analyze_videos(bee_model_path, "", input_videos, working_dir)
