@@ -18,6 +18,7 @@ import pickle
 
 MAX_SQUARED_DISTANCE = 0.01
 min_consecutive_frames_to_be_counted = 3
+number_of_images_without_bees_to_save = 3
 
 
 
@@ -35,9 +36,13 @@ def start(video_path, queue, working_dir, image_size=(640,480)):
     last_24_frames = [None] * 24
     skip_counter = -1
 
+    frames_without_bees_saved = 0
     
     detected_bees_store_path = os.path.join(working_dir,"detected_bees")
+    frames_without_bees_path = os.path.join(working_dir,"frames_without_bees")
     os.makedirs(detected_bees_store_path,exist_ok=True)
+    os.makedirs(frames_without_bees_path,exist_ok=True)
+
     cap = cv2.VideoCapture(video_path)
     no_of_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))  
     print("Number of frames: " + str(no_of_frames))
@@ -83,6 +88,10 @@ def start(video_path, queue, working_dir, image_size=(640,480)):
 
         
         if not detections:
+            if frames_without_bees_saved < number_of_images_without_bees_to_save:
+                save_path = os.path.join(frames_without_bees_path,str(frame_number) + ".jpg")
+                cv2.imwrite(save_path,original_image)
+                frames_without_bees_saved += 1
             skip_counter = 0
         elif skip_counter == 12:
             skip_counter = -1
@@ -102,9 +111,9 @@ def start(video_path, queue, working_dir, image_size=(640,480)):
             skip_counter = -1
             
             
-            
+    
     enumerate_detections(detection_map)
-
+    
     with open(os.path.join(working_dir,"detection_map.pkl"), 'wb') as f:
         pickle.dump(detection_map,f)
 
