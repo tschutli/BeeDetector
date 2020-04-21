@@ -100,7 +100,7 @@ def hole_frame_reader(working_dir,frame_queue,image_size):
         detections_dict = {}
         
         queue_item = PrioritizedItem(1,(image_expand,detections_dict,is_done))
-        queue.put(queue_item)
+        frame_queue.put(queue_item)
         is_done.wait()
         
         detections = []
@@ -253,6 +253,6 @@ if __name__== "__main__":
     hole_model_path = constants.hole_model_path
     input_videos = constants.input_videos
     working_dir = constants.working_dir
-    analyze_videos(bee_model_path, "", input_videos, working_dir)
+    analyze_videos(bee_model_path, hole_model_path, input_videos, working_dir)
     
     
