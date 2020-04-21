@@ -23,6 +23,7 @@ from dataclasses import dataclass, field
 from typing import Any
 from utils import eval_utils
 from utils import file_utils
+import string
 
 
 @dataclass(order=True)
@@ -53,7 +54,7 @@ def analyze_videos(trained_bee_model, trained_hole_model, input_videos, working_
           
     detect_bees(trained_bee_model,input_videos,working_dirs)
     detect_holes(trained_hole_model,input_videos,working_dirs)
-    #TODO detect holes
+
     #TODO detect numbers on bees
     #TODO get statistics
     
@@ -68,8 +69,8 @@ def detect_holes(trained_hole_model, input_videos, working_dirs):
     with ThreadPoolExecutor(max_workers=num_threads) as executor:
         futures = []
         for (input_video,working_dir) in zip(input_videos,working_dirs):
-            if os.path.isfile(os.path.join(working_dir,"detected_holes.pkl")):
-                continue
+            #if os.path.isfile(os.path.join(working_dir,"detected_holes.pkl")):
+            #    continue
             future = executor.submit(hole_frame_reader,working_dir,frame_queue,image_size)
             
             futures.append(future)
@@ -86,10 +87,12 @@ def detect_holes(trained_hole_model, input_videos, working_dirs):
 
 
 def hole_frame_reader(working_dir,frame_queue,image_size):
+    '''
     hole_images_folder = os.path.join(working_dir,"frames_without_bees")
     all_images = file_utils.get_all_image_paths_in_folder(hole_images_folder)
     
     all_detections = []
+    num_holes_detected = []
     for image_path in all_images:
         
         image = Image.open(image_path)
@@ -104,10 +107,8 @@ def hole_frame_reader(working_dir,frame_queue,image_size):
         is_done.wait()
         
         detections = []
-        count = 0
         for i,score in enumerate(detections_dict['detection_scores']):
             if score >= min_confidence_score:
-                count += 1
                 top = detections_dict['detection_boxes'][i][0]
                 left = detections_dict['detection_boxes'][i][1]
                 bottom = detections_dict['detection_boxes'][i][2]
@@ -117,14 +118,157 @@ def hole_frame_reader(working_dir,frame_queue,image_size):
         
         detections = eval_utils.non_max_suppression(detections,0.5)
         all_detections.append(detections)
+        num_holes_detected.append(len(detections))
+
+    most_frequent_answer = max(set(num_holes_detected), key = num_holes_detected.count)
+    index_of_most_frequent_answer = num_holes_detected.index(most_frequent_answer)
+    
+    print(num_holes_detected)
+    
+    holes = all_detections[index_of_most_frequent_answer]
+    '''
+    holes = []
+    
+    with open(os.path.join(working_dir,"detected_holes.pkl"), 'rb') as f:
+        holes = pickle.load(f)
+
+    enumerate_holes(holes)
+    
 
 
-    for detections in all_detections:
-        with open(os.path.join(working_dir,"detected_holes.pkl"), 'wb') as f:
-            pickle.dump(detections,f)
+    detection_map = {}
+    with open(os.path.join(working_dir,"detection_map.pkl"), 'rb') as f:
+        detection_map = pickle.load(f)
 
-        print("num_detections: " + str(len(detections)))
+    def is_id_in_frame(bee_id, frame_number):
+        if detection_map[frame_number] and detection_map[frame_number] != "Skipped":
+            for detection in detection_map[frame_number]:
+                if detection["id"] == bee_id:
+                    return True
+        return False
+            
 
+    
+    frame_number = 0
+    while frame_number in detection_map:
+        
+        if detection_map[frame_number] and detection_map[frame_number] != "Skipped":
+            for detection in detection_map[frame_number]:
+                bee_id = detection["id"]
+                if bee_id == -1:
+                    continue
+                if not is_id_in_frame(bee_id,frame_number-1):
+                    if detection["class"] == 1:
+                        #Bee is sitting
+                        print()
+        frame_number += 1
+    
+    '''
+    with open(os.path.join(working_dir,"detected_holes.pkl"), 'wb') as f:
+        pickle.dump(holes,f)
+    '''
+    
+    
+def save_holes_predictions_image(holes,image_path,destination_path):
+    
+    image = cv2.imread(image_path)
+    height, width, channels = image.shape
+    
+    for hole_id,hole in enumerate(holes):
+        [top,left,bottom,right] = hole["bounding_box"]
+        top = int(top*height)
+        bottom = int(bottom*height)
+        left = int(left*width)
+        right = int(right*width)
+        rectangle_color = (0,0,255)
+        
+        image = cv2.rectangle(image, (left,top), (right,bottom), rectangle_color, 2)
+        show_str = str(hole_id)
+        if "name" in hole:
+            show_str = hole["name"]
+        cv2.putText(image, show_str, (left, top-10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, rectangle_color, 2)
+    cv2.imwrite(destination_path,image)
+
+
+    
+def enumerate_holes(detections):
+    
+    right_neighbours = {}
+    
+    for hole_id,hole in enumerate(detections):
+        [top,left,bottom,right] = hole["bounding_box"]
+        (center_x,center_y) = ((right+left)/2,(bottom+top)/2)
+        right_neighbours[hole_id] = None
+        for hole_id2,hole2 in enumerate(detections):
+            if hole_id == hole_id2:
+                continue
+            [top2,left2,bottom2,right2] = hole2["bounding_box"]
+            (center_x2,center_y2) = ((right2+left2)/2,(bottom2+top2)/2)
+            if center_y2 < bottom and center_y2 > top and center_x2 > center_x:
+                #it should be in the same row and right of the current hole
+                squared_distance = pow(center_x-center_x2,2) + pow(center_y-center_y2,2)
+                if right_neighbours[hole_id] == None or right_neighbours[hole_id]["distance"] > squared_distance:
+                    right_neighbours[hole_id] = {"right_neighbour" : hole_id2, "distance": squared_distance}
+    
+    right_most_holes = []
+    
+    for hole_id in right_neighbours.keys():
+        if right_neighbours[hole_id] == None:
+            [top,left,bottom,right] = detections[hole_id]["bounding_box"]
+            (center_x,center_y) = ((right+left)/2,(bottom+top)/2)
+            right_most_holes.append((hole_id,center_y))
+    
+    right_most_holes.sort(key=lambda tup: tup[1])  # sorts in place
+    
+    print(right_most_holes)
+    
+    def get_left_most_element_of_row(hole_id):
+        left_neighbor = hole_id
+        has_found_a_left_neighbor = True
+        while has_found_a_left_neighbor:
+            has_found_a_left_neighbor = False
+            for hole_id2 in right_neighbours.keys():
+                if right_neighbours[hole_id2] == None:
+                    continue
+                #print(str(hole_id2) + "/" + str(right_neighbours[hole_id2]["right_neighbour"]))
+
+                if right_neighbours[hole_id2]["right_neighbour"] == left_neighbor:
+                    left_neighbor = hole_id2
+                    has_found_a_left_neighbor = True
+                    break
+                
+        return left_neighbor
+
+    
+
+
+    for index,(hole_id,center_y) in enumerate(right_most_holes):
+        letter = string.ascii_uppercase[index]
+        current_element = get_left_most_element_of_row(hole_id)
+
+        hole_column = 0
+
+        while True:
+            detections[current_element]["name"] = str(str(letter) + str(hole_column))
+            hole_column += 1
+            if right_neighbours[current_element] == None:
+                break
+            else:
+                current_element = right_neighbours[current_element]["right_neighbour"]
+            
+        
+                
+    
+    
+            
+    
+    
+    
+
+        
+        
+    
+    
     
     
 def detect_bees(trained_bee_model,input_videos,working_dirs):

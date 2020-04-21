@@ -18,7 +18,7 @@ import pickle
 
 MAX_SQUARED_DISTANCE = 0.01
 min_consecutive_frames_to_be_counted = 3
-number_of_images_without_bees_to_save = 3
+number_of_images_without_bees_to_save = 23
 
 
 
@@ -148,13 +148,13 @@ def enumerate_detections(detection_map):
                     current_bee_index += 1
                 else:
                     [top,left,bottom,right] = detection["bounding_box"]
-                    (x, y) = ((right+left)/2,(bottom-top)/2)
+                    (x, y) = ((right+left)/2,(bottom+top)/2)
                     
                     distances = []
                     
                     for prev_index,prev_detection in enumerate(prev_detections):
                         [top,left,bottom,right] = prev_detection["bounding_box"]
-                        (prev_x, prev_y) = ((right+left)/2,(bottom-top)/2)
+                        (prev_x, prev_y) = ((right+left)/2,(bottom+top)/2)
                         squared_distance = pow(x-prev_x,2) + pow(y-prev_y,2)
                         distances.append({"distance": squared_distance, "index": prev_index})
                         #print("{:.2e}".format(squared_distance))
