@@ -17,7 +17,7 @@ import frame_reader
 import predictor
 from threading import Event
 from concurrent.futures import ThreadPoolExecutor
-import hole_analyze
+import hole_analysis
 
 
 
@@ -61,7 +61,7 @@ def detect_holes(trained_hole_model, input_videos, working_dirs):
         for (input_video,working_dir) in zip(input_videos,working_dirs):
             #if os.path.isfile(os.path.join(working_dir,"detected_holes.pkl")):
             #    continue
-            future = executor.submit(hole_analyze.hole_frame_reader,working_dir,frame_queue,image_size)
+            future = executor.submit(hole_analysis.hole_frame_reader,working_dir,frame_queue,image_size)
             
             futures.append(future)
         
