@@ -27,6 +27,9 @@ class PrioritizedItem:
 
 
 def hole_frame_reader(working_dir,frame_queue,image_size):
+    
+    print("Detecting holes: " + os.path.basename(working_dir),flush=True)
+    
     hole_images_folder = os.path.join(working_dir,"frames_without_bees")
     all_images = file_utils.get_all_image_paths_in_folder(hole_images_folder)
     
@@ -60,14 +63,15 @@ def hole_frame_reader(working_dir,frame_queue,image_size):
         num_holes_detected.append(len(detections))
     most_frequent_answer = max(set(num_holes_detected), key = num_holes_detected.count)
     index_of_most_frequent_answer = num_holes_detected.index(most_frequent_answer)
-    
-    print(num_holes_detected)
-    
+        
     holes = all_detections[index_of_most_frequent_answer]
-    holes = []
     
+    #TODO: Remove these three lines
+    holes = []
     with open(os.path.join(working_dir,"detected_holes.pkl"), 'rb') as f:
         holes = pickle.load(f)
+
+    print("Detected " + str(len(holes)) + " holes: " + os.path.basename(working_dir),flush=True)
 
     enumerate_holes(holes)
     src_image = all_images[index_of_most_frequent_answer]
@@ -196,9 +200,7 @@ def enumerate_holes(detections):
             right_most_holes.append((hole_id,center_y))
     
     right_most_holes.sort(key=lambda tup: tup[1])  # sorts in place
-    
-    print(right_most_holes)
-    
+        
     def get_left_most_element_of_row(hole_id):
         left_neighbor = hole_id
         has_found_a_left_neighbor = True
