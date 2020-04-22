@@ -139,7 +139,7 @@ def visualize(input_video,detection_map,output_path):
     #cap = cv2.VideoCapture(input_video)
     #cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
     
-    print("Visualizing video: " + input_video)
+    print("Visualizing video: " + input_video, flush=True)
 
     out = cv2.VideoWriter(output_path,cv2.VideoWriter_fourcc(*'MP4V'), 25, image_size)
 
@@ -189,7 +189,16 @@ def visualize(input_video,detection_map,output_path):
                     
                     image = cv2.rectangle(image, (left,top), (right,bottom), rectangle_color, 2)
                     
-                    cv2.putText(image, str(detection["id"]) + " / " + '{0:.2f}'.format(detection["score"]), (left, top-10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, rectangle_color, 2)
+                    starting_point = detection["start"]
+                    if starting_point == None:
+                        starting_point = "?"
+                    end_point = detection["end"]
+                    if end_point == None:
+                        end_point = "?"
+
+                    bee_description = str(detection["id"]) + ": " + starting_point + " -> " + end_point
+                    
+                    cv2.putText(image, bee_description, (left, top-10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, rectangle_color, 2)
                     
 
         #print("3: " + str(current_milli_time()-start), flush=True)

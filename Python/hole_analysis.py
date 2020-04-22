@@ -30,6 +30,7 @@ def hole_frame_reader(working_dir,frame_queue,image_size):
     
     print("Detecting holes: " + os.path.basename(working_dir),flush=True)
     
+    '''
     hole_images_folder = os.path.join(working_dir,"frames_without_bees")
     all_images = file_utils.get_all_image_paths_in_folder(hole_images_folder)
     
@@ -65,17 +66,18 @@ def hole_frame_reader(working_dir,frame_queue,image_size):
     index_of_most_frequent_answer = num_holes_detected.index(most_frequent_answer)
         
     holes = all_detections[index_of_most_frequent_answer]
-    
+    '''
     #TODO: Remove these three lines
     holes = []
     with open(os.path.join(working_dir,"detected_holes.pkl"), 'rb') as f:
         holes = pickle.load(f)
 
     print("Detected " + str(len(holes)) + " holes: " + os.path.basename(working_dir),flush=True)
-
+    
     enumerate_holes(holes)
-    src_image = all_images[index_of_most_frequent_answer]
-    save_holes_predictions_image(holes,src_image,os.path.join(hole_images_folder,"detected_holes.jpg"))
+    #src_image = all_images[index_of_most_frequent_answer]
+    #save_holes_predictions_image(holes,src_image,os.path.join(hole_images_folder,"detected_holes.jpg"))
+
     
 
     detection_map = {}
@@ -107,15 +109,17 @@ def hole_frame_reader(working_dir,frame_queue,image_size):
                     continue
                 #check if the bee with bee_id was already present in the previous frame
                 if not is_id_in_frame(bee_id,frame_number-1):
-                    if detection["class"] == 1:
+                    if detection["class"] == 2:
                         #Bee is sitting
                         starts[bee_id] = get_hole_at_position(center_x,center_y,holes)
+
                     else:
                         starts[bee_id] = None
                 if not is_id_in_frame(bee_id,frame_number+1):
-                    if detection["class"] == 1:
+                    if detection["class"] == 2:
                         #Bee is sitting
                         ends[bee_id] = get_hole_at_position(center_x,center_y,holes)
+
                     else:
                         ends[bee_id] = None    
         frame_number += 1
