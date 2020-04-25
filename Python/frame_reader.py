@@ -34,6 +34,8 @@ def start(video_path, queue, working_dir, image_size=(640,480),progress_callback
         return
 
     
+    progress_callback("Starting to detect bees", video_path)
+
     detection_map = {}
     #TODO: Load existing detection_map
     
@@ -49,7 +51,7 @@ def start(video_path, queue, working_dir, image_size=(640,480),progress_callback
 
     cap = cv2.VideoCapture(video_path)
     no_of_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))  
-    print("Number of frames: " + str(no_of_frames))
+    #print("Number of frames: " + str(no_of_frames))
     #start_frame = int(no_of_frames / num_processes)* thread_id
     #end_frame = int(no_of_frames / num_processes)* (thread_id+1)
     #cap.set(cv2.CAP_PROP_POS_FRAMES, start_frame)
@@ -57,14 +59,17 @@ def start(video_path, queue, working_dir, image_size=(640,480),progress_callback
     #for frame_number in range(start_frame,end_frame):
     for frame_number in range(0,no_of_frames):
         
-        if pause_event != None and pause_event.is_set():
-            #TODO: pause gracefully. Save some intermediate results to continue later
-            cap.release()
-            return
 
         
         if (frame_number) % 100 == 0:
-            print(os.path.basename(video_path) + " progress: " + str(frame_number) + " / " + str(no_of_frames))
+                        
+            progress_callback(frame_number/no_of_frames,video_path)
+            
+            if pause_event != None and pause_event.is_set():
+                #TODO: pause gracefully. Save some intermediate results to continue later
+                cap.release()
+                return
+
 
         cap_frame_number = cap.get(cv2.CAP_PROP_POS_FRAMES)
         if cap_frame_number != frame_number:
@@ -129,7 +134,8 @@ def start(video_path, queue, working_dir, image_size=(640,480),progress_callback
 
     # Release resources
     cap.release()
-    print(os.path.basename(video_path) + ": DONE!")
+    progress_callback(1.0,video_path)
+    progress_callback("Finished detecting bees", video_path)
 
     
 

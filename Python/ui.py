@@ -39,6 +39,7 @@ from threading import Event
 import threading
 import time
 import tkinter.scrolledtext as scrolledtext
+import datetime
 
 
 
@@ -84,9 +85,12 @@ def pause_analyze_videos(pause_event,progress_callback):
     analyze_videos_thread.join()
     pause_event.clear()
     progress_callback("stopped_script")
+    progress_callback("Pause")
+
 
 
 def start_analyze_videos(videos, results_folder, visualize,pause_event, progress_callback):
+    
     if not os.path.isdir(results_folder):
         messagebox.showerror("Error", "The Results Folder is not a valid folder. Please check the spelling.")
         return
@@ -103,8 +107,10 @@ def start_analyze_videos(videos, results_folder, visualize,pause_event, progress
     global analyze_videos_thread
     my_args=(constants.bee_model_path, constants.hole_model_path, videos, results_folder, visualize, progress_callback, pause_event,)
     analyze_videos_thread = threading.Thread(target=analyze_video.analyze_videos, args=my_args)
+    analyze_videos_thread.daemon = True
     analyze_videos_thread.start()
     progress_callback("started_script")
+    progress_callback("Start")
 
     
     
@@ -119,7 +125,7 @@ def convert_paths_list(paths_string):
         
 
 def start_ui():
-
+    
     main_window = Tk()
     main_window.geometry(str(window_width) + "x" + str(window_height))
     #main_window.iconbitmap(resource_path('flower.ico'))
@@ -141,7 +147,7 @@ def start_ui():
     
     #Description
     lbl = Label(tab1, justify=LEFT, wraplength=window_width-20, text=description)
-    lbl.grid(column=0, row=0, pady=5, padx = 5, columnspan=4, sticky=W)
+    lbl.grid(column=0, row=0, pady=5, padx = 5, columnspan=4, sticky="ew")
     
     
     
@@ -179,10 +185,10 @@ def start_ui():
     output_label = Label(tab1,justify=LEFT, text="Output: ")
     output_label.grid(column=0, row=49, pady=5, padx = 5, columnspan=1, sticky=W)
 
-    txt = scrolledtext.ScrolledText(tab1, undo=True, height=12)
-    txt['font'] = ('consolas', '12')
-    txt.config(state="disabled")
-    txt.grid(column=0, row=50, pady=5, padx = 5, columnspan=4, sticky=W)
+    console = scrolledtext.ScrolledText(tab1, undo=True, height=12)
+    #console['font'] = ('consolas', '12')
+    console.config(state="disabled")
+    console.grid(column=0, row=50, pady=5, padx = 5, columnspan=4, sticky="ew")
 
 
     
@@ -236,11 +242,11 @@ def start_ui():
     
     def progress_callback(progress):
         if progress == "started_script":
-            run_button.configure(text="Pause", command=lambda: pause_analyze_videos(pause_event,progress_callback))
+            run_button.configure(text="Pause",state="normal", command=lambda: threading.Thread(target=pause_analyze_videos, args=(pause_event,progress_callback,)).start())
         elif progress == "started_stopping_script":
-            run_button.configure(text="Please wait...")
+            run_button.configure(text="Please wait...", state="disabled")
         elif progress == "stopped_script":
-            run_button.configure(text="Start", command=lambda: start_analyze_videos(convert_paths_list(video_paths_input.get()),output_path_input.get(),visualize_variable.get(),pause_event,progress_callback))
+            run_button.configure(text="Start", state="normal", command=lambda: start_analyze_videos(convert_paths_list(video_paths_input.get()),output_path_input.get(),visualize_variable.get(),pause_event,progress_callback))
         elif type(progress) == tuple:
             if type(progress[1]) == float:
                 #it is a numerical progress
@@ -253,7 +259,15 @@ def start_ui():
                 elif progress[0] == "detect_numbers":
                     detect_numbers_progress_bar['value'] = progress[1]*100
         elif type(progress) == str:
-            print(progress)
+            console.configure(state='normal')
+            
+            dateTimeObj = datetime.datetime.now()
+            timestampStr = dateTimeObj.strftime("%d.%b %H:%M:%S")
+            console.insert(END,timestampStr + ": " + progress + "\n")
+            console.see(END)
+            
+            console.config(state="disabled")
+            
 
 
         
@@ -261,7 +275,7 @@ def start_ui():
 
     
     
-    run_button.configure(command=lambda: start_analyze_videos(convert_paths_list(video_paths_input.get()),output_path_input.get(),visualize_variable.get(),pause_event,progress_callback))
+    run_button.configure(state="normal",command=lambda: start_analyze_videos(convert_paths_list(video_paths_input.get()),output_path_input.get(),visualize_variable.get(),pause_event,progress_callback))
     
     run_button.grid(column=0, row=20, pady=5, padx = 5,columnspan=4, sticky='ew')
     
@@ -271,11 +285,24 @@ def start_ui():
     tabControl.add(tab1, text='Analyze Bee Videos')
     
     
-    
+
     
     
     tabControl.pack(expand=True, fill="both")  # Pack to make visible
         
+    
+    
+    
+    
+    output_path_input.delete(0,END)
+    output_path_input.insert(0,constants.working_dir)
+    video_paths_input.delete(0,END)
+    video_paths_input.insert(0,"C:/Users/johan/Desktop/MVI_0003.MP4; ")
+
+
+    
+    
+    
     
     main_window.mainloop()
 

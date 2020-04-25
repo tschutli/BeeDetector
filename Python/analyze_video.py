@@ -32,6 +32,44 @@ min_confidence_score = 0.5
 num_threads = 7
 
 
+
+class ProgressHelper(object): 
+    input_videos = None
+    progress_callback = None
+    progress_bar_key = None
+    progress_map = {}
+      
+    def __init__(self, input_videos, progress_callback, progress_bar_key): 
+        self.input_videos = input_videos
+        self.progress_callback = progress_callback
+        self.progress_bar_key = progress_bar_key
+        self.progress_map = {}
+        for input_video in input_videos:
+            self.progress_map[input_video] = 0.0
+
+      
+    def get_overall_progress(self): 
+        progress_sum = 0.0
+        for input_video in self.progress_map.keys():
+            progress_sum += self.progress_map[input_video]
+        return progress_sum / len(self.progress_map.keys())
+
+    
+    def control_progress_callback(self,progress,input_video):
+        if self.progress_callback == None:
+            return
+        if type(progress) == float:
+            self.progress_map[input_video] = progress
+            self.progress_callback((self.progress_bar_key,self.get_overall_progress()))
+        else:
+            self.progress_callback(progress + ": " + input_video)
+
+
+
+
+
+
+
 def analyze_videos(trained_bee_model, trained_hole_model, input_videos, working_dir, visualize=True, progress_callback=None, pause_event=None):
     
     working_dirs = []
@@ -54,9 +92,13 @@ def analyze_videos(trained_bee_model, trained_hole_model, input_videos, working_
         visualize_videos(input_videos,working_dirs,progress_callback, pause_event)
     
 
+
     
 def detect_holes(trained_hole_model, input_videos, working_dirs,progress_callback=None, pause_event=None):
     
+    
+    progress_helper = ProgressHelper(working_dirs,progress_callback,"detect_holes")
+
     frame_queue = queue.PriorityQueue()
         
     with ThreadPoolExecutor(max_workers=num_threads) as executor:
@@ -64,7 +106,7 @@ def detect_holes(trained_hole_model, input_videos, working_dirs,progress_callbac
         for (input_video,working_dir) in zip(input_videos,working_dirs):
             #if os.path.isfile(os.path.join(working_dir,"detected_holes.pkl")):
             #    continue
-            future = executor.submit(hole_analysis.hole_frame_reader,working_dir,frame_queue,image_size,progress_callback, pause_event)
+            future = executor.submit(hole_analysis.hole_frame_reader,working_dir,frame_queue,image_size,progress_helper.control_progress_callback, pause_event)
             
             futures.append(future)
         
@@ -94,14 +136,18 @@ def detect_bees(trained_bee_model,input_videos,working_dirs, progress_callback=N
         
     #start = current_milli_time()
     
+    progress_helper = ProgressHelper(input_videos,progress_callback,"detect_bees")
+
+    
     frame_queue = queue.PriorityQueue()
         
     with ThreadPoolExecutor(max_workers=num_threads) as executor:
         futures = []
         for (input_video,working_dir) in zip(input_videos,working_dirs):
             if os.path.isfile(os.path.join(working_dir,"detection_map.pkl")):
+                progress_helper.control_progress_callback(1.0,input_video)
                 continue
-            future = executor.submit(frame_reader.start, input_video, frame_queue, working_dir,image_size,progress_callback,pause_event)
+            future = executor.submit(frame_reader.start, input_video, frame_queue, working_dir,image_size,progress_helper.control_progress_callback,pause_event)
             futures.append(future)
         
         
@@ -115,28 +161,15 @@ def detect_bees(trained_bee_model,input_videos,working_dirs, progress_callback=N
         predictor_stop_event.set()
         predictor_thread.join()
         
+        
+
+
 
     
 def visualize_videos(input_videos,working_dirs,progress_callback=None, pause_event=None):
     
-    progress_map = {}
-    for input_video in input_videos:
-        progress_map[input_video] = 0.0
-    def get_overall_progress():
-        progress_sum = 0.0
-        for input_video in progress_map.keys():
-            progress_sum += progress_map[input_video]
-        return progress_sum / len(progress_map.keys())
-        
-    def control_progress_callback(progress,input_video):
-        if progress_callback == None:
-            return
-        if type(progress) == float:
-            progress_map[input_video] = progress
-            progress_callback(("visualize",get_overall_progress()))
-            if progress == 1.0:
-                progress_callback("Finished detecting bees: " + input_video)
-            
+    progress_helper = ProgressHelper(input_videos,progress_callback,"visualize")
+    
     
     with ThreadPoolExecutor(max_workers=num_threads) as executor:
         
@@ -147,7 +180,7 @@ def visualize_videos(input_videos,working_dirs,progress_callback=None, pause_eve
             with open(os.path.join(working_dir,"detection_map.pkl"), 'rb') as f:
                 detection_map = pickle.load(f)
             
-            future = executor.submit(visualize, input_video, detection_map, os.path.join(working_dir,"visualization.MP4"),control_progress_callback,pause_event)
+            future = executor.submit(visualize, input_video, detection_map, os.path.join(working_dir,"visualization.MP4"),progress_helper.control_progress_callback,pause_event)
             futures.append(future)
 
         for future in futures:
@@ -161,12 +194,13 @@ def visualize(input_video,detection_map,output_path,progress_callback=None, paus
     #start = current_milli_time()
     #cap = cv2.VideoCapture(input_video)
     #cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+    if pause_event != None and pause_event.is_set():
+        return
+
     
-    print("Visualizing video: " + input_video, flush=True)
+    progress_callback("Starting Visualization of video", input_video)
 
     out = cv2.VideoWriter(output_path,cv2.VideoWriter_fourcc(*'MP4V'), 25, image_size)
-
-    fps = 25
     
 
     cap = cv2.VideoCapture(input_video)
@@ -179,11 +213,11 @@ def visualize(input_video,detection_map,output_path,progress_callback=None, paus
         if frame_number % 100 == 0:
             progress_callback(frame_number/no_of_frames,input_video)
         
-        if pause_event != None and pause_event.is_set():
-            break
+            if pause_event != None and pause_event.is_set():
+                cap.release() 
+                out.release()
+                return
             
-        start = current_milli_time()
-
         ret, image = cap.read()
         if not ret:
             print("BREAK")
@@ -239,6 +273,7 @@ def visualize(input_video,detection_map,output_path,progress_callback=None, paus
     cap.release() 
     out.release()
     progress_callback(1.0,input_video)
+    progress_callback("Finished visualizing video", input_video)
 
     
 

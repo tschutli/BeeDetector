@@ -31,7 +31,8 @@ def hole_frame_reader(working_dir,frame_queue,image_size,progress_callback=None,
     if pause_event != None and pause_event.is_set():
         return
     
-    print("Detecting holes: " + os.path.basename(working_dir),flush=True)
+    progress_callback("Starting to detect holes", working_dir)
+
     
     '''
     hole_images_folder = os.path.join(working_dir,"frames_without_bees")
@@ -39,8 +40,10 @@ def hole_frame_reader(working_dir,frame_queue,image_size,progress_callback=None,
     
     all_detections = []
     num_holes_detected = []
-    for image_path in all_images:
+    for index,image_path in enumerate(all_images):
         
+        progress_callback(index/len(all_images),working_dir)
+
         if pause_event != None and pause_event.is_set():
             #TODO: pause gracefully. Save some intermediate results to continue later
             return
@@ -151,6 +154,10 @@ def hole_frame_reader(working_dir,frame_queue,image_size,progress_callback=None,
 
     with open(os.path.join(working_dir,"detected_holes.pkl"), 'wb') as f:
         pickle.dump(holes,f)
+    
+    progress_callback(1.0,working_dir)
+    progress_callback("Finished detecting holes",working_dir)
+
 
 
 
