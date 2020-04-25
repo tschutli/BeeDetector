@@ -26,7 +26,10 @@ class PrioritizedItem:
     item: Any=field(compare=False)
 
 
-def hole_frame_reader(working_dir,frame_queue,image_size):
+def hole_frame_reader(working_dir,frame_queue,image_size,progress_callback=None, pause_event=None):
+    
+    if pause_event != None and pause_event.is_set():
+        return
     
     print("Detecting holes: " + os.path.basename(working_dir),flush=True)
     
@@ -37,6 +40,11 @@ def hole_frame_reader(working_dir,frame_queue,image_size):
     all_detections = []
     num_holes_detected = []
     for image_path in all_images:
+        
+        if pause_event != None and pause_event.is_set():
+            #TODO: pause gracefully. Save some intermediate results to continue later
+            return
+
         
         image = Image.open(image_path)
         resized_image = image.resize(image_size)
@@ -136,6 +144,8 @@ def hole_frame_reader(working_dir,frame_queue,image_size):
                 detection["end"] = ends[bee_id]
         frame_number += 1
         
+    print("Detected " + str(len(starts.keys())) + " flights: " + os.path.basename(working_dir))
+    
     with open(os.path.join(working_dir,"detection_map.pkl"), 'wb') as f:
         pickle.dump(detection_map,f)
 

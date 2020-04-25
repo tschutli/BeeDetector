@@ -28,7 +28,11 @@ class PrioritizedItem:
     item: Any=field(compare=False)
 
 
-def start(video_path, queue, working_dir, image_size=(640,480)):
+def start(video_path, queue, working_dir, image_size=(640,480),progress_callback=None, pause_event=None):
+    
+    if pause_event != None and pause_event.is_set():
+        return
+
     
     detection_map = {}
     #TODO: Load existing detection_map
@@ -52,6 +56,12 @@ def start(video_path, queue, working_dir, image_size=(640,480)):
     
     #for frame_number in range(start_frame,end_frame):
     for frame_number in range(0,no_of_frames):
+        
+        if pause_event != None and pause_event.is_set():
+            #TODO: pause gracefully. Save some intermediate results to continue later
+            cap.release()
+            return
+
         
         if (frame_number) % 100 == 0:
             print(os.path.basename(video_path) + " progress: " + str(frame_number) + " / " + str(no_of_frames))
