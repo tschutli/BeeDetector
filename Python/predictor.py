@@ -22,7 +22,7 @@ class PrioritizedItem:
 current_milli_time = lambda: int(round(time.time() * 1000))
 
 
-def start(trained_model,frame_queue,image_size,stop_event):
+def start(trained_model,frame_queue,stop_event):
     
     stats = []
     stats_wait = []
@@ -32,7 +32,7 @@ def start(trained_model,frame_queue,image_size,stop_event):
     with detection_graph.as_default():
         with tf.Session() as sess:
             
-            tensor_dict = get_tensor_dict(image_size)
+            tensor_dict = get_tensor_dict()
             image_tensor = tf.get_default_graph().get_tensor_by_name('image_tensor:0') 
 
 
@@ -91,19 +91,16 @@ def get_detection_graph(PATH_TO_FROZEN_GRAPH):
     return detection_graph
 
 
-def get_tensor_dict(tile_size):
+def get_tensor_dict():
   """
   Helper function that returns a tensor_dict dictionary that is needed for the 
   prediction algorithm.
   
-  Parameters:
-      tile_size (int): The size of the tiles on which the prediction algorithm is
-          run on.
-
   Returns:
       dict: The tensor dictionary
   
   """
+  
       # Get handles to input and output tensors
   ops = tf.get_default_graph().get_operations()
   all_tensor_names = {output.name for op in ops for output in op.outputs}
@@ -111,24 +108,10 @@ def get_tensor_dict(tile_size):
   for key in ['num_detections', 'detection_boxes', 'detection_scores','detection_classes', 'detection_masks']:
     tensor_name = key + ':0'
     if tensor_name in all_tensor_names:
-      tensor_dict[key] = tf.get_default_graph().get_tensor_by_name(tensor_name)
-  if 'detection_masks' in tensor_dict:
-    # The following processing is only for single image
-    detection_boxes = tf.squeeze(tensor_dict['detection_boxes'], [0])
-    detection_masks = tf.squeeze(tensor_dict['detection_masks'], [0])
-    # Reframe is required to translate mask from box coordinates to image coordinates and fit the image size.
-    real_num_detection = tf.cast(tensor_dict['num_detections'][0], tf.int32)
-    detection_boxes = tf.slice(detection_boxes, [0, 0], [real_num_detection, -1])
-    detection_masks = tf.slice(detection_masks, [0, 0, 0], [real_num_detection, -1, -1])
-    detection_masks_reframed = utils_ops.reframe_box_masks_to_image_masks(
-        detection_masks, detection_boxes, tile_size[1], tile_size[0])
-    detection_masks_reframed = tf.cast(
-        tf.greater(detection_masks_reframed, 0.5), tf.uint8)
-    # Follow the convention by adding back the batch dimension
-    tensor_dict['detection_masks'] = tf.expand_dims(
-        detection_masks_reframed, 0)
-    
+      tensor_dict[key] = tf.get_default_graph().get_tensor_by_name(tensor_name)    
   return tensor_dict
+
+
 
 def clean_pred_dict(pred_dict, output_dict):
     # all outputs are float32 numpy arrays, so convert types as appropriate

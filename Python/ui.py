@@ -117,7 +117,7 @@ def start_analyze_videos(videos, results_folder, visualize,pause_event, progress
         
     #analyze_video.analyze_videos(constants.bee_model_path, constants.hole_model_path, videos, results_folder, visualize, progress_callback, pause_event)
     global analyze_videos_thread
-    my_args=(constants.bee_model_path, constants.hole_model_path, videos, results_folder, visualize, progress_callback, pause_event,)
+    my_args=(constants.bee_model_path, constants.hole_model_path,constants.number_model_path, videos, results_folder, visualize, progress_callback, pause_event,)
     analyze_videos_thread = threading.Thread(target=analyze_video.analyze_videos, args=my_args)
     analyze_videos_thread.daemon = True
     analyze_videos_thread.start()

@@ -111,7 +111,12 @@ def convert_annotation_folders(input_folders, test_splits, validation_splits, pr
             
             #copying the image along with annotations to the train directory
             dest_image_path = os.path.join(train_images_dir,"inputdir" + str(input_folder_index) + "_" + os.path.basename(image_path))
-            resize_image(image_path,dest_image_path,annotations,tensorflow_tile_size)
+            if tensorflow_tile_size != None:
+                resize_image(image_path,dest_image_path,annotations,tensorflow_tile_size)
+            else:
+                image = Image.open(image_path)
+                image.save(dest_image_path)
+
             
             
             dest_xml_path = dest_image_path[:-4] + ".xml"
@@ -191,8 +196,8 @@ def resize_image(image_path,dest_image_path,annotations,size=None):
 
 def filter_annotations(annotations,labels):
     for annotation in annotations:
-        #Remove all spaces and numbers from annotation name
-        filtered_name = ''.join(x for x in annotation["name"] if not x.isdigit()).rstrip()
+        #Remove all spaces
+        filtered_name = annotation["name"].rstrip()
         annotation["name"] = filtered_name        
         
         add_label_to_labelcount(filtered_name, labels)
@@ -294,11 +299,15 @@ def move_image_and_annotations_to_folder(image_path,dest_folder, labels, labels_
 
     #update the labels count to represent the counts of the training data
     xmlTree = ET.parse(image_path[:-4] + ".xml")
-    for elem in xmlTree.iter():
-        if(elem.tag == "name"):    
-            flower_name = elem.text
-            labels[flower_name] = labels[flower_name]-1
-            add_label_to_labelcount(flower_name,labels_test)
+    root = xmlTree.getroot()
+
+    for child in root:
+        if(child.tag == "object"):
+            for att in child:
+                if(att.tag == "name"):
+                    flower_name = att.text
+                    labels[flower_name] = labels[flower_name]-1
+                    add_label_to_labelcount(flower_name,labels_test)
     move(image_path,os.path.join(dest_folder,image_name))
     move(image_path[:-4] + ".xml",os.path.join(dest_folder,xml_name))
 
@@ -440,15 +449,24 @@ def set_config_file_parameters(project_dir,num_classes,tensorflow_tile_size=(640
     Returns:
         None
     """
-
     pipeline_config = pipeline_pb2.TrainEvalPipelineConfig()                                                                                                                                                                                                          
     with tf.gfile.GFile(project_dir + "/pre-trained-model/pipeline.config", "r") as f:                                                                                                                                                                                                                     
         proto_str = f.read()                                                                                                                                                                                                                                          
         text_format.Merge(proto_str, pipeline_config)                                                                                                                                                                                                                 
 
     pipeline_config.model.faster_rcnn.num_classes = num_classes
-    pipeline_config.model.faster_rcnn.image_resizer.fixed_shape_resizer.width = tensorflow_tile_size[0]
-    pipeline_config.model.faster_rcnn.image_resizer.fixed_shape_resizer.height = tensorflow_tile_size[1]                                                                                                                                                                                       
+    
+    if tensorflow_tile_size==None:
+        pipeline_config.model.faster_rcnn.image_resizer.keep_aspect_ratio_resizer.min_dimension=300
+        pipeline_config.model.faster_rcnn.image_resizer.keep_aspect_ratio_resizer.max_dimension=300
+    else:
+        pipeline_config.model.faster_rcnn.image_resizer.fixed_shape_resizer.width = tensorflow_tile_size[0]
+        pipeline_config.model.faster_rcnn.image_resizer.fixed_shape_resizer.height = tensorflow_tile_size[1]                                                                                                                                                                                       
+    
+    
+    pipeline_config.model.faster_rcnn.first_stage_max_proposals = 200
+    pipeline_config.model.faster_rcnn.second_stage_post_processing.batch_non_max_suppression.max_detections_per_class = 200                                                                                                                                                                                 
+    pipeline_config.model.faster_rcnn.second_stage_post_processing.batch_non_max_suppression.max_total_detections = 200                                                                                                                                                                                 
 
     '''
     pipeline_config.model.faster_rcnn.feature_extractor.first_stage_features_stride = 8                                                                                                                                                                                 
@@ -456,9 +474,6 @@ def set_config_file_parameters(project_dir,num_classes,tensorflow_tile_size=(640
     pipeline_config.model.faster_rcnn.first_stage_anchor_generator.grid_anchor_generator.width_stride = 8                                                                                                                                                                                 
     pipeline_config.model.faster_rcnn.first_stage_anchor_generator.grid_anchor_generator.height = 256                                                                                                                                                                               
     pipeline_config.model.faster_rcnn.first_stage_anchor_generator.grid_anchor_generator.width = 256                                                                                                                                                                                 
-    pipeline_config.model.faster_rcnn.second_stage_post_processing.batch_non_max_suppression.max_detections_per_class = 300                                                                                                                                                                                 
-    pipeline_config.model.faster_rcnn.second_stage_post_processing.batch_non_max_suppression.max_total_detections = 300                                                                                                                                                                                 
-    pipeline_config.model.faster_rcnn.first_stage_max_proposals = 300
     pipeline_config.model.faster_rcnn.second_stage_post_processing.batch_non_max_suppression.score_threshold = 0.0
     '''
     for i in range(len(pipeline_config.train_config.optimizer.momentum_optimizer.learning_rate.manual_step_learning_rate.schedule)):
@@ -597,6 +612,10 @@ if __name__== "__main__":
     #GPU capabilities and ground resolution (the higher the ground resolution, the greater this tile_size can 
     #be chosen.)
     tensorflow_tile_size = constants.tensorflow_tile_size
+    
+    
+    #set tensorflow_tile_size to None if the images should not be resized
+    tensorflow_tile_size = None
         
     convert_annotation_folders(input_folders, test_splits,validation_splits, project_folder, tensorflow_tile_size=tensorflow_tile_size)
 

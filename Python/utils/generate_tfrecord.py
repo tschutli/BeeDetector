@@ -80,15 +80,14 @@ def create_tf_example(group, path, labels):
     classes = []
     weights = []
 
-
     for index, row in group.object.iterrows():
         xmins.append(row['xmin'] / width)
         xmaxs.append(row['xmax'] / width)
         ymins.append(row['ymin'] / height)
         ymaxs.append(row['ymax'] / height)
-        classes_text.append(row['class'].encode('utf8'))
-        classes.append(class_text_to_int(row['class'],labels))
-        weights.append(class_text_to_weight(row['class'],labels))
+        classes_text.append(str(row['class']).encode('utf8'))
+        classes.append(class_text_to_int(str(row['class']),labels))
+        weights.append(class_text_to_weight(str(row['class']),labels))
 
 
     tf_example = tf.train.Example(features=tf.train.Features(feature={

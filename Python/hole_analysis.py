@@ -34,7 +34,6 @@ def hole_frame_reader(working_dir,frame_queue,image_size,progress_callback=None,
     progress_callback("Starting to detect holes", working_dir)
 
     
-    '''
     hole_images_folder = os.path.join(working_dir,"frames_without_bees")
     all_images = file_utils.get_all_image_paths_in_folder(hole_images_folder)
     
@@ -67,8 +66,8 @@ def hole_frame_reader(working_dir,frame_queue,image_size,progress_callback=None,
                 left = detections_dict['detection_boxes'][i][1]
                 bottom = detections_dict['detection_boxes'][i][2]
                 right = detections_dict['detection_boxes'][i][3]
-                detection_class = detections_dict['detection_classes'][i]
-                detections.append({"bounding_box": [top,left,bottom,right], "score": float(score), "class": detection_class})
+                #detection_class = detections_dict['detection_classes'][i]
+                detections.append({"bounding_box": [top,left,bottom,right], "score": float(score), "name": "hole"})
         
         detections = eval_utils.non_max_suppression(detections,0.5)
         all_detections.append(detections)
@@ -77,17 +76,25 @@ def hole_frame_reader(working_dir,frame_queue,image_size,progress_callback=None,
     index_of_most_frequent_answer = num_holes_detected.index(most_frequent_answer)
         
     holes = all_detections[index_of_most_frequent_answer]
+
+    
+
     '''
     #TODO: Remove these three lines
     holes = []
     with open(os.path.join(working_dir,"detected_holes.pkl"), 'rb') as f:
         holes = pickle.load(f)
-
+    '''
+    
     print("Detected " + str(len(holes)) + " holes: " + os.path.basename(working_dir),flush=True)
     
     enumerate_holes(holes)
-    #src_image = all_images[index_of_most_frequent_answer]
-    #save_holes_predictions_image(holes,src_image,os.path.join(hole_images_folder,"detected_holes.jpg"))
+    
+    print(holes)
+    
+    src_image = all_images[index_of_most_frequent_answer]
+    save_holes_predictions_image(holes,src_image,os.path.join(hole_images_folder,"detected_holes.jpg"))
+    file_utils.save_annotations_to_xml(holes, all_images[index_of_most_frequent_answer],  all_images[index_of_most_frequent_answer][:-4] + ".xml")
 
     
 
@@ -122,14 +129,14 @@ def hole_frame_reader(working_dir,frame_queue,image_size,progress_callback=None,
                 if not is_id_in_frame(bee_id,frame_number-1):
                     if detection["class"] == 2:
                         #Bee is sitting
-                        starts[bee_id] = get_hole_at_position(center_x,center_y,holes)
+                        starts[bee_id] = get_hole_id_at_position(center_x,center_y,holes)
 
                     else:
                         starts[bee_id] = None
                 if not is_id_in_frame(bee_id,frame_number+1):
                     if detection["class"] == 2:
                         #Bee is sitting
-                        ends[bee_id] = get_hole_at_position(center_x,center_y,holes)
+                        ends[bee_id] = get_hole_id_at_position(center_x,center_y,holes)
 
                     else:
                         ends[bee_id] = None    
@@ -162,11 +169,11 @@ def hole_frame_reader(working_dir,frame_queue,image_size,progress_callback=None,
 
 
     
-def get_hole_at_position(x,y,holes):
+def get_hole_id_at_position(x,y,holes):
     for hole in holes:
         [top,left,bottom,right] = hole["bounding_box"]
         if x<right and x>left and y<bottom and y>top:
-            return hole["name"]
+            return hole["id"]
     return None
 
     
@@ -186,8 +193,8 @@ def save_holes_predictions_image(holes,image_path,destination_path):
         
         image = cv2.rectangle(image, (left,top), (right,bottom), rectangle_color, 3)
         show_str = str(hole_id)
-        if "name" in hole:
-            show_str = hole["name"]
+        if "id" in hole:
+            show_str = hole["id"]
         cv2.putText(image, show_str, (left, top-10), cv2.FONT_HERSHEY_SIMPLEX, 1.5, rectangle_color, 3)
     cv2.imwrite(destination_path,image)
 
@@ -249,7 +256,7 @@ def enumerate_holes(detections):
         hole_column = 1
 
         while True:
-            detections[current_element]["name"] = str(str(letter) + str(hole_column))
+            detections[current_element]["id"] = str(str(letter) + str(hole_column))
             hole_column += 1
             if right_neighbours[current_element] == None:
                 break

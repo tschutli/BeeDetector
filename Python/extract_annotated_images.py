@@ -29,7 +29,7 @@ def extract_annotated_images(input_folder,output_folder):
     print("Done. Copied " + str(count) + " images and annotation files.")
 
 if __name__ == '__main__':
-    input_folder = "D:/Frames"
-    output_folder = "C:/Users/johan/Desktop/Agroscope/Data/Video1"
+    input_folder = "C:/Users/johan/Desktop/Agroscope/Data/Video1/numbers1"
+    output_folder = "C:/Users/johan/Desktop/Agroscope/Data/Video1/numbers"
     
     extract_annotated_images(input_folder,output_folder)

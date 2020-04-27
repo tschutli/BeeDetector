@@ -18,7 +18,7 @@ import predictor
 from threading import Event
 from concurrent.futures import ThreadPoolExecutor
 import hole_analysis
-
+import number_detector
 
 
 
@@ -70,7 +70,7 @@ class ProgressHelper(object):
 
 
 
-def analyze_videos(trained_bee_model, trained_hole_model, input_videos, working_dir, visualize=True, progress_callback=None, pause_event=None):
+def analyze_videos(trained_bee_model, trained_hole_model, trained_number_model, input_videos, working_dir, visualize=True, progress_callback=None, pause_event=None):
     
     working_dirs = []
     for input_video in input_videos:
@@ -85,7 +85,8 @@ def analyze_videos(trained_bee_model, trained_hole_model, input_videos, working_
     
     detect_holes(trained_hole_model,input_videos,working_dirs,progress_callback, pause_event)
 
-    #TODO detect numbers on bees
+    detect_numbers(trained_number_model,working_dirs,progress_callback,pause_event)
+    
     #TODO get statistics
     
     if visualize:
@@ -94,6 +95,32 @@ def analyze_videos(trained_bee_model, trained_hole_model, input_videos, working_
     if pause_event != None and pause_event.is_set():
         progress_callback("Success. All videos are analyzed.")
 
+
+
+def detect_numbers(trained_number_model,working_dirs,progress_callback=None,pause_event=None):
+    progress_helper = ProgressHelper(working_dirs,progress_callback,"detect_numbers")
+    
+    frame_queue = queue.PriorityQueue()
+    
+    with ThreadPoolExecutor(max_workers=num_threads) as executor:
+        futures = []
+        for working_dir in working_dirs:
+            if os.path.isfile(os.path.join(working_dir,"detected_numbers.pkl")):
+                continue
+            future = executor.submit(number_detector.detect_numbers,working_dir,frame_queue,progress_helper.control_progress_callback, pause_event)
+            
+            futures.append(future)
+        
+        
+        predictor_stop_event = Event()
+        predictor_thread = threading.Thread(target=predictor.start,args=(trained_number_model,frame_queue,predictor_stop_event,))
+        predictor_thread.daemon=True
+        predictor_thread.start()
+        
+        for future in futures:
+            future.result()
+        predictor_stop_event.set()
+        predictor_thread.join()
 
 
     
@@ -115,7 +142,7 @@ def detect_holes(trained_hole_model, input_videos, working_dirs,progress_callbac
         
         
         predictor_stop_event = Event()
-        predictor_thread = threading.Thread(target=predictor.start,args=(trained_hole_model,frame_queue,image_size,predictor_stop_event,))
+        predictor_thread = threading.Thread(target=predictor.start,args=(trained_hole_model,frame_queue,predictor_stop_event,))
         predictor_thread.daemon=True
         predictor_thread.start()
         
@@ -155,7 +182,7 @@ def detect_bees(trained_bee_model,input_videos,working_dirs, progress_callback=N
         
         
         predictor_stop_event = Event()
-        predictor_thread = threading.Thread(target=predictor.start,args=(trained_bee_model,frame_queue,image_size,predictor_stop_event,))
+        predictor_thread = threading.Thread(target=predictor.start,args=(trained_bee_model,frame_queue,predictor_stop_event,))
         predictor_thread.daemon=True
         predictor_thread.start()
         
@@ -289,6 +316,7 @@ if __name__== "__main__":
     hole_model_path = constants.hole_model_path
     input_videos = constants.input_videos
     working_dir = constants.working_dir
-    analyze_videos(bee_model_path, hole_model_path, input_videos, working_dir)
+    number_model_path = constants.number_model_path
+    analyze_videos(bee_model_path, hole_model_path, number_model_path, input_videos, working_dir)
     
     
