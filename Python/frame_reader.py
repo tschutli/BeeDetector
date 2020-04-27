@@ -10,6 +10,7 @@ from PIL import Image
 import numpy as np
 from threading import Event
 import os
+from utils import file_utils
 from utils import eval_utils
 from dataclasses import dataclass, field
 from typing import Any
@@ -51,6 +52,7 @@ def start(video_path, queue, working_dir, image_size=(640,480),progress_callback
 
     cap = cv2.VideoCapture(video_path)
     no_of_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))  
+    fps = int(cap.get(cv2.CAP_PROP_FPS))
     #print("Number of frames: " + str(no_of_frames))
     #start_frame = int(no_of_frames / num_processes)* thread_id
     #end_frame = int(no_of_frames / num_processes)* (thread_id+1)
@@ -96,6 +98,22 @@ def start(video_path, queue, working_dir, image_size=(640,480),progress_callback
         resized_image = cv2.resize(original_image, image_size)
         
         detections = get_detections(resized_image,queue,1)
+        
+        '''
+        if len(detections) > 0:
+            #Save detection results, including image to folder (so that it can be edited in labelimg later.)
+            annotation_folder = os.path.join(working_dir,"bee_annotations")
+            os.makedirs(annotation_folder,exist_ok=True)
+            minutes = str(int(frame_number/fps/60)).zfill(3)
+            seconds = str(int(frame_number/fps) % 60).zfill(2)
+            frame = str(frame_number % fps).zfill(2)
+            
+            
+            annotation_im_path = os.path.join(annotation_folder,"min_" + minutes+ "_sec_" + seconds + "_frame_" + frame + ".jpg")
+            cv2.imwrite(annotation_im_path,original_image)
+            annotation_xml_path = os.path.join(annotation_folder,"min_" + minutes+ "_sec_" + seconds + "_frame_" + frame + ".xml")
+            file_utils.save_annotations_to_xml(detections, annotation_im_path, annotation_xml_path)
+        '''
         
         detection_map[frame_number] = detections
         

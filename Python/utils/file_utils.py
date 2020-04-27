@@ -97,8 +97,54 @@ def delete_folder_contents(folder_path):
             elif os.path.isdir(file_path): shutil.rmtree(file_path)
         except Exception as e:
             print(e)
-                
+       
+         
+def save_annotations_to_xml(annotations, image_path, xml_path):
+    """Given a list of annotations, this function builds an xml tree from it and saves it to the xml_path
+
+    Parameters:
+        annotations (list): a list of flower dicts
+        image_path (str): the path of the corresponding image
+        xml_path (str): output path
+
+    Returns:
+        None
+    """
+
+    root = ET.Element("annotation")
     
+    image = Image.open(image_path)
+    ET.SubElement(root, "filename").text = os.path.basename(image_path)
+    
+    width, height = image.size
+    size = ET.SubElement(root, "size")
+    ET.SubElement(size, "width").text = str(width)
+    ET.SubElement(size, "height").text = str(height)
+    
+    for annotation in annotations:
+        flower_name = annotation["name"]
+        
+        annotation_object = ET.SubElement(root, "object")
+        ET.SubElement(annotation_object, "name").text = flower_name
+        ET.SubElement(annotation_object, "pose").text = "Unspecified"
+        ET.SubElement(annotation_object, "truncated").text = str(0)
+        ET.SubElement(annotation_object, "difficult").text = str(0)            
+        bndbox = ET.SubElement(annotation_object, "bndbox")
+
+        [top,left,bottom,right] = annotation["bounding_box"]
+        ET.SubElement(bndbox, "xmin").text = str(int(left))
+        ET.SubElement(bndbox, "ymin").text = str(int(top))
+        ET.SubElement(bndbox, "xmax").text = str(int(right))
+        ET.SubElement(bndbox, "ymax").text = str(int(bottom))
+        
+        if "score" in annotation:
+            ET.SubElement(annotation_object, "score").text = str(annotation["score"])
+            
+    #image.save(image_path)
+    tree = ET.ElementTree(root)
+    tree.write(xml_path)
+
+
     
 def get_annotations_from_xml(xml_path):
     """Reads annotations from an xml file
@@ -133,6 +179,8 @@ def get_annotations_from_xml(xml_path):
                         if(bound.tag == "ymax"):
                             bottom = int(bound.text)
                     annotation["bounding_box"] = [top,left,bottom,right]
+                if(att.tag == "score"):
+                    annotation["score"] = float(att.text)
             annotations.append(annotation)
     return annotations
 
