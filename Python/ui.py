@@ -76,6 +76,18 @@ def process_callback(progress):
             run_button.configure(text="Run")
 
 '''  
+
+
+def resource_path(relative_path):
+    """ Get absolute path to resource, works for dev and for PyInstaller """
+    try:
+        # PyInstaller creates a temp folder and stores path in _MEIPASS
+        base_path = sys._MEIPASS
+    except Exception:
+        base_path = os.path.abspath(".")
+
+    return os.path.join(base_path, relative_path)
+
 analyze_videos_thread = None
 
 def pause_analyze_videos(pause_event,progress_callback):
@@ -128,7 +140,7 @@ def start_ui():
     
     main_window = Tk()
     main_window.geometry(str(window_width) + "x" + str(window_height))
-    #main_window.iconbitmap(resource_path('flower.ico'))
+    #main_window.iconbitmap(resource_path('bee.ico'))
     
     
     main_window.title("Bee Movement Analyzer")
@@ -247,6 +259,9 @@ def start_ui():
             run_button.configure(text="Please wait...", state="disabled")
         elif progress == "stopped_script":
             run_button.configure(text="Start", state="normal", command=lambda: start_analyze_videos(convert_paths_list(video_paths_input.get()),output_path_input.get(),visualize_variable.get(),pause_event,progress_callback))
+        elif progress == "Success. All videos are analyzed.":
+            run_button.configure(text="Start", state="normal", command=lambda: start_analyze_videos(convert_paths_list(video_paths_input.get()),output_path_input.get(),visualize_variable.get(),pause_event,progress_callback))
+            progress_callback("Success. All videos are analyzed!")
         elif type(progress) == tuple:
             if type(progress[1]) == float:
                 #it is a numerical progress

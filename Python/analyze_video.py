@@ -91,6 +91,9 @@ def analyze_videos(trained_bee_model, trained_hole_model, input_videos, working_
     if visualize:
         visualize_videos(input_videos,working_dirs,progress_callback, pause_event)
     
+    if pause_event != None and pause_event.is_set():
+        progress_callback("Success. All videos are analyzed.")
+
 
 
     
