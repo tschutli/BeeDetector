@@ -15,8 +15,9 @@ import shutil
 import xml.etree.cElementTree as ET
 from PIL import Image, ImageDraw
 import numpy
-import gdal
 import numpy as np
+from xml.dom import minidom
+
 
 def read_json_file(file_path):
     """Reads a json file into a dict
@@ -142,6 +143,7 @@ def save_annotations_to_xml(annotations, image_path, xml_path):
             
     #image.save(image_path)
     tree = ET.ElementTree(root)
+    
     tree.write(xml_path)
 
 
@@ -287,20 +289,12 @@ def check_all_json_files_in_folder(folder_path):
     
     
 def get_image_array(image_path, xoff=0, yoff=0, xsize=None, ysize=None):
-    '''
-    try:
-        image = Image.open(image_path)
-        width, height = image.size
-        img = Image.open(image_path).convert("RGB")
-        img_array = numpy.asarray(img)
-        return img_array
-    except Image.DecompressionBombError:
-    '''
-    ds = gdal.Open(image_path)
-    image_array = ds.ReadAsArray(xoff, yoff, xsize, ysize).astype(np.uint8)
-    image_array = np.swapaxes(image_array,0,1)
-    image_array = np.swapaxes(image_array,1,2)
-    return image_array
+    
+    image = Image.open(image_path)
+    width, height = image.size
+    img = Image.open(image_path).convert("RGB")
+    img_array = numpy.asarray(img)
+    return img_array
   
 
 
@@ -309,35 +303,9 @@ def save_array_as_image(image_path,image_array, tile_size = None):
     image_array = image_array.astype(np.uint8)
     if not image_path.endswith(".png") and not image_path.endswith(".jpg") and not image_path.endswith(".tif"):
         print("Error! image_path has to end with .png, .jpg or .tif")
-    height = image_array.shape[0]
-    width = image_array.shape[1]
-    if height*width < Image.MAX_IMAGE_PIXELS:
-        newIm = Image.fromarray(image_array, "RGB")
-        newIm.save(image_path)
-    
-    else:
-        gdal.AllRegister()
-        driver = gdal.GetDriverByName( 'MEM' )
-        ds1 = driver.Create( '', width, height, 3, gdal.GDT_Byte)
-        ds = driver.CreateCopy(image_path, ds1, 0)
-            
-        image_array = np.swapaxes(image_array,2,1)
-        image_array = np.swapaxes(image_array,1,0)
-        ds.GetRasterBand(1).WriteArray(image_array[0], 0, 0)
-        ds.GetRasterBand(2).WriteArray(image_array[1], 0, 0)
-        ds.GetRasterBand(3).WriteArray(image_array[2], 0, 0)
-
-        if not tile_size:
-            gdal.Translate(image_path,ds, options=gdal.TranslateOptions(bandList=[1,2,3], format="png"))
-
-        else:
-            for i in range(0, width, tile_size):
-                for j in range(0, height, tile_size):
-                    #define paths of image tile and the corresponding json file containing the geo information
-                    out_path_image = image_path[:-4] + "row" + str(int(j/tile_size)) + "_col" + str(int(i/tile_size)) + ".png"
-                    #tile image with gdal (copy bands 1, 2 and 3)
-                    gdal.Translate(out_path_image,ds, options=gdal.TranslateOptions(srcWin=[i,j,tile_size,tile_size], bandList=[1,2,3]))
-                    
+    newIm = Image.fromarray(image_array, "RGB")
+    newIm.save(image_path)
+                        
     
 def strip_image(input_image_path, roi_file, output_image_path):
     """Turns all pixels that are not within a roi polygon black
