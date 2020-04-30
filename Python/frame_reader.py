@@ -142,7 +142,10 @@ def start(video_path, queue, working_dir, image_size=(640,480),progress_callback
         else:
             skip_counter = -1
             
-            
+    #TODO remove this
+    with open(os.path.join(working_dir,"detection_map_before_enumerate.pkl"), 'wb') as f:
+        pickle.dump(detection_map,f)
+
     
     enumerate_detections(detection_map)
     
@@ -208,7 +211,7 @@ def enumerate_detections(detection_map):
                     assigned_ids.append(detection["id"])
                 else:
                     print("Two objects very close to each other causing confusion at frame: " + str(frame_number))
-                    detection_map[frame_number][assigned_ids.index(detection["id"])] = current_bee_index
+                    detection_map[frame_number][assigned_ids.index(detection["id"])]["id"] = current_bee_index
                     assigned_ids.append(detection["id"])
                     detection["id"] = current_bee_index + 1
                     current_bee_index += 2
