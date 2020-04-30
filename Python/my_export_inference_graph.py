@@ -164,4 +164,5 @@ def run(project_dir,look_in_checkpoints_dir = True, model_selection_criterion="f
 
 
 if __name__ == '__main__':
-    print("Please use the export-inference-graph command in the cli.py script to execute this script.")
+    project_dir = constants.project_folder
+    run(project_dir,checkpoint=17500)

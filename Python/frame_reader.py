@@ -99,7 +99,6 @@ def start(video_path, queue, working_dir, image_size=(640,480),progress_callback
         
         detections = get_detections(resized_image,queue,1)
         
-        '''
         if len(detections) > 0:
             #Save detection results, including image to folder (so that it can be edited in labelimg later.)
             annotation_folder = os.path.join(working_dir,"bee_annotations")
@@ -113,7 +112,7 @@ def start(video_path, queue, working_dir, image_size=(640,480),progress_callback
             cv2.imwrite(annotation_im_path,original_image)
             annotation_xml_path = os.path.join(annotation_folder,"min_" + minutes+ "_sec_" + seconds + "_frame_" + frame + ".xml")
             file_utils.save_annotations_to_xml(detections, annotation_im_path, annotation_xml_path)
-        '''
+
         
         detection_map[frame_number] = detections
         
@@ -286,7 +285,12 @@ def get_detections(resized_image,queue,priority,min_confidence_score = 0.5):
             bottom = detections_dict['detection_boxes'][i][2]
             right = detections_dict['detection_boxes'][i][3]
             detection_class = detections_dict['detection_classes'][i]
-            detections.append({"bounding_box": [top,left,bottom,right], "score": float(score), "class": detection_class})
+            #TODO: Make sure class 2 is always bee
+            if detection_class == 2:
+                detection_name = "bee"
+            else:
+                detection_name = "bee flying"
+            detections.append({"bounding_box": [top,left,bottom,right], "score": float(score), "name": detection_name})
     
     detections = eval_utils.non_max_suppression(detections,0.5)
     

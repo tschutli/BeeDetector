@@ -615,7 +615,7 @@ if __name__== "__main__":
     
     
     #set tensorflow_tile_size to None if the images should not be resized
-    tensorflow_tile_size = None
+    #tensorflow_tile_size = None
         
     convert_annotation_folders(input_folders, test_splits,validation_splits, project_folder, tensorflow_tile_size=tensorflow_tile_size)
 

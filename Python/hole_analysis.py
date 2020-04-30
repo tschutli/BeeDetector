@@ -89,9 +89,7 @@ def hole_frame_reader(working_dir,frame_queue,image_size,progress_callback=None,
     print("Detected " + str(len(holes)) + " holes: " + os.path.basename(working_dir),flush=True)
     
     enumerate_holes(holes)
-    
-    print(holes)
-    
+        
     src_image = all_images[index_of_most_frequent_answer]
     save_holes_predictions_image(holes,src_image,os.path.join(hole_images_folder,"detected_holes.jpg"))
     file_utils.save_annotations_to_xml(holes, all_images[index_of_most_frequent_answer],  all_images[index_of_most_frequent_answer][:-4] + ".xml")
@@ -127,14 +125,14 @@ def hole_frame_reader(working_dir,frame_queue,image_size,progress_callback=None,
                     continue
                 #check if the bee with bee_id was already present in the previous frame
                 if not is_id_in_frame(bee_id,frame_number-1):
-                    if detection["class"] == 2:
+                    if detection["name"] == "bee":
                         #Bee is sitting
                         starts[bee_id] = get_hole_id_at_position(center_x,center_y,holes)
 
                     else:
                         starts[bee_id] = None
                 if not is_id_in_frame(bee_id,frame_number+1):
-                    if detection["class"] == 2:
+                    if detection["name"] == "bee":
                         #Bee is sitting
                         ends[bee_id] = get_hole_id_at_position(center_x,center_y,holes)
 
@@ -262,4 +260,18 @@ def enumerate_holes(detections):
                 break
             else:
                 current_element = right_neighbours[current_element]["right_neighbour"]
+    
+    unspecified_holes = []
+    for hole_index, hole in enumerate(detections):
+        if not "id" in hole:
+            unspecified_holes.append(hole_index)
+    
+    unspecified_holes.reverse()
+    for unspecified_hole in unspecified_holes:
+        detections.pop(unspecified_hole)
+    if len(unspecified_holes) > 0:
+        print("Found " + str(len(unspecified_holes)) + " hole detections, that could not be enumerated.")
+            
+        
+
             

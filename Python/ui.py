@@ -312,7 +312,7 @@ def start_ui():
     output_path_input.delete(0,END)
     output_path_input.insert(0,constants.working_dir)
     video_paths_input.delete(0,END)
-    video_paths_input.insert(0,"C:/Users/johan/Desktop/MVI_0003.MP4; ")
+    video_paths_input.insert(0,"C:/Users/johan/Desktop/Test5.MP4; ")
 
 
     

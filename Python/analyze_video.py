@@ -27,7 +27,6 @@ current_milli_time = lambda: int(round(time.time() * 1000))
 
 
 image_size = constants.tensorflow_tile_size
-image_size = (1000,750)
 min_confidence_score = 0.5
 num_threads = 7
 
@@ -85,7 +84,7 @@ def analyze_videos(trained_bee_model, trained_hole_model, trained_number_model, 
     
     detect_holes(trained_hole_model,input_videos,working_dirs,progress_callback, pause_event)
 
-    detect_numbers(trained_number_model,working_dirs,progress_callback,pause_event)
+    #detect_numbers(trained_number_model,working_dirs,progress_callback,pause_event)
     
     #TODO get statistics
     
@@ -275,9 +274,9 @@ def visualize(input_video,detection_map,output_path,progress_callback=None, paus
                     left = int(left*image_size[0])
                     right = int(right*image_size[0])
                     rectangle_color = (0,0,255)
-                    if(detection["class"] == 0):
+                    if(detection["name"] == "bee"):
                         rectangle_color = (0,255,0)
-                    elif(detection["class"] == 1):
+                    elif(detection["name"] == "bee flying"):
                         rectangle_color = (255,0,0)      
                     
                     image = cv2.rectangle(image, (left,top), (right,bottom), rectangle_color, 2)
@@ -311,12 +310,15 @@ def visualize(input_video,detection_map,output_path,progress_callback=None, paus
 
 
 if __name__== "__main__":
+
+    def progress_callback(progress):
+        print(progress)
     
     bee_model_path = constants.bee_model_path
     hole_model_path = constants.hole_model_path
+    number_model_path = constants.number_model_path
     input_videos = constants.input_videos
     working_dir = constants.working_dir
-    number_model_path = constants.number_model_path
-    analyze_videos(bee_model_path, hole_model_path, number_model_path, input_videos, working_dir)
+    analyze_videos(bee_model_path, hole_model_path, number_model_path, input_videos, working_dir,progress_callback=progress_callback)
     
     

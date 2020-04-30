@@ -9,6 +9,7 @@ Created on Tue Apr 16 14:52:32 2019
 This file contains some helper functions which are used by multiple scripts such as enumerating all images
 in a folder or reading a json file.
 """
+
 import os
 import json
 import shutil
@@ -133,6 +134,12 @@ def save_annotations_to_xml(annotations, image_path, xml_path):
         bndbox = ET.SubElement(annotation_object, "bndbox")
 
         [top,left,bottom,right] = annotation["bounding_box"]
+        if top<1 and left<1 and bottom<1 and right<1:
+            top = int(top*height)
+            bottom = int(bottom*height)
+            left = int(left*width)
+            right = int(right*width)
+
         ET.SubElement(bndbox, "xmin").text = str(int(left))
         ET.SubElement(bndbox, "ymin").text = str(int(top))
         ET.SubElement(bndbox, "xmax").text = str(int(right))
