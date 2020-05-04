@@ -18,7 +18,7 @@ import predictor
 from threading import Event
 from concurrent.futures import ThreadPoolExecutor
 import hole_analysis
-import number_detector
+import colors_detector
 
 
 
@@ -69,7 +69,7 @@ class ProgressHelper(object):
 
 
 
-def analyze_videos(trained_bee_model, trained_hole_model, trained_number_model, input_videos, working_dir, visualize=True, progress_callback=None, pause_event=None):
+def analyze_videos(trained_bee_model, trained_hole_model, trained_colors_model, input_videos, working_dir, visualize=True, progress_callback=None, pause_event=None):
     
     working_dirs = []
     for input_video in input_videos:
@@ -84,7 +84,8 @@ def analyze_videos(trained_bee_model, trained_hole_model, trained_number_model, 
     
     detect_holes(trained_hole_model,input_videos,working_dirs,progress_callback, pause_event)
 
-    #detect_numbers(trained_number_model,working_dirs,progress_callback,pause_event)
+    detect_colors(trained_colors_model,working_dirs,progress_callback,pause_event)
+    
     
     #TODO get statistics
     
@@ -96,7 +97,7 @@ def analyze_videos(trained_bee_model, trained_hole_model, trained_number_model, 
 
 
 
-def detect_numbers(trained_number_model,working_dirs,progress_callback=None,pause_event=None):
+def detect_colors(trained_colors_model,working_dirs,progress_callback=None,pause_event=None):
     progress_helper = ProgressHelper(working_dirs,progress_callback,"detect_numbers")
     
     frame_queue = queue.PriorityQueue()
@@ -106,13 +107,14 @@ def detect_numbers(trained_number_model,working_dirs,progress_callback=None,paus
         for working_dir in working_dirs:
             if os.path.isfile(os.path.join(working_dir,"detected_numbers.pkl")):
                 continue
-            future = executor.submit(number_detector.detect_numbers,working_dir,frame_queue,progress_helper.control_progress_callback, pause_event)
+            labels = ["green","white","yellow"]
+            future = executor.submit(colors_detector.detect_colors,working_dir,frame_queue,labels,progress_helper.control_progress_callback, pause_event)
             
             futures.append(future)
         
         
         predictor_stop_event = Event()
-        predictor_thread = threading.Thread(target=predictor.start,args=(trained_number_model,frame_queue,predictor_stop_event,))
+        predictor_thread = threading.Thread(target=predictor.start,args=(trained_colors_model,frame_queue,predictor_stop_event,))
         predictor_thread.daemon=True
         predictor_thread.start()
         

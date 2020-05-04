@@ -5,7 +5,6 @@ Created on Sun Apr 19 13:00:29 2020
 @author: johan
 """
 import tensorflow as tf
-from object_detection.utils import ops as utils_ops
 import numpy as np
 import time
 import statistics
