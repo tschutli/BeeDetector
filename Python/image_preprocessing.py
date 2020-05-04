@@ -186,7 +186,7 @@ def rotate_annotations(rot_angle, annotations, image):
         if rot_angle == 90:
             annotation["bounding_box"] = [width-right,top,width-left,bottom]
         if rot_angle == 180:
-            annotation["bounding_box"] = [height-bottom,width-left,height-top,width-right]
+            annotation["bounding_box"] = [height-bottom,width-right,height-top,width-left]
         if rot_angle == 270:
             annotation["bounding_box"] = [left,height-bottom,right,height-top]
 
