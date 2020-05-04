@@ -19,8 +19,8 @@ def extract_annotated_images(input_folder,output_folder):
     count = 0
     for image_path in progressbar.progressbar(all_images):
         src_annotation_path = image_path[:-4] + ".xml"
-
-        if os.path.isfile(src_annotation_path):
+        annotations = file_utils.get_annotations_from_xml(src_annotation_path)
+        if len(annotations) > 0:
             count += 1
             dest_image_path = os.path.join(output_folder,os.path.basename(image_path))
             dest_annotation_path = os.path.join(output_folder, os.path.basename(src_annotation_path))
@@ -29,7 +29,7 @@ def extract_annotated_images(input_folder,output_folder):
     print("Done. Copied " + str(count) + " images and annotation files.")
 
 if __name__ == '__main__':
-    input_folder = "C:/Users/johan/Desktop/Agroscope/Data/Video1/numbers1"
-    output_folder = "C:/Users/johan/Desktop/Agroscope/Data/Video1/numbers"
+    input_folder = "C:/Users/johan/Downloads/detected_bees_vid4_5/detected_bees"
+    output_folder = "C:/Users/johan/Desktop/Data/video4/numbers5"
     
     extract_annotated_images(input_folder,output_folder)

@@ -105,24 +105,36 @@ def convert_annotation_folders(input_folders, test_splits, validation_splits, pr
         for i in progressbar.progressbar(range(len(image_paths))):
             image_path = image_paths[i]
     
-            annotations = file_utils.get_annotations_from_xml(image_path[:-4]+".xml")
-            
-            filter_annotations(annotations,labels)
             
             #copying the image along with annotations to the train directory
-            dest_image_path = os.path.join(train_images_dir,"inputdir" + str(input_folder_index) + "_" + os.path.basename(image_path))
-            if tensorflow_tile_size != None:
-                resize_image(image_path,dest_image_path,annotations,tensorflow_tile_size)
+            if tensorflow_tile_size == None:
+                rot_angles = [0,90,180,270]
             else:
-                image = Image.open(image_path)
-                image.save(dest_image_path)
-
+                rot_angles = [0]
             
-            
-            dest_xml_path = dest_image_path[:-4] + ".xml"
+            for rot_angle in rot_angles:
+                annotations = file_utils.get_annotations_from_xml(image_path[:-4]+".xml")
+                filter_annotations(annotations,labels)
+                if rot_angle == 0:
+                    dest_image_path = os.path.join(train_images_dir,"inputdir" + str(input_folder_index) + "_" + os.path.basename(image_path))
 
-            dest_annotations_xml = build_xml_tree(annotations,dest_image_path)
-            dest_annotations_xml.write(dest_xml_path)
+                else:
+                    dest_image_path = os.path.join(train_images_dir,"inputdir" + str(input_folder_index) + "_" +"rot" + str(rot_angle) + "_" + os.path.basename(image_path))
+
+                if tensorflow_tile_size != None:
+                    resize_image(image_path,dest_image_path,annotations,tensorflow_tile_size)
+                else:
+                    image = Image.open(image_path)
+                    rotate_annotations(rot_angle,annotations,image)
+                    image = image.rotate(rot_angle,expand=True)
+                    image.save(dest_image_path)
+                    
+    
+
+                dest_xml_path = dest_image_path[:-4] + ".xml"
+
+                dest_annotations_xml = build_xml_tree(annotations,dest_image_path)
+                dest_annotations_xml.write(dest_xml_path)
 
     
     
@@ -164,6 +176,19 @@ def convert_annotation_folders(input_folders, test_splits, validation_splits, pr
 
     print(str(len(labels)) + " classes used for training.")
     print("Done!")
+
+   
+def rotate_annotations(rot_angle, annotations, image):
+    "rotate counter clock wise"
+    width, height = image.size
+    for annotation in annotations:
+        [top,left,bottom,right] = annotation["bounding_box"]
+        if rot_angle == 90:
+            annotation["bounding_box"] = [width-right,top,width-left,bottom]
+        if rot_angle == 180:
+            annotation["bounding_box"] = [height-bottom,width-left,height-top,width-right]
+        if rot_angle == 270:
+            annotation["bounding_box"] = [left,height-bottom,right,height-top]
 
 
 def resize_image(image_path,dest_image_path,annotations,size=None):
@@ -323,12 +348,14 @@ def write_labels_to_labelmapfile(labels, output_path):
         None
     """
 
+        
+    
     output_name = os.path.join(output_path, "label_map.pbtxt")
     end = '\n'
     s = ' '
     out = ''
 
-    for ID, name in enumerate(labels):
+    for ID, name in enumerate(sorted(labels)):
         out += 'item' + s + '{' + end
         out += s*2 + 'id:' + ' ' + (str(ID+1)) + end
         out += s*2 + 'name:' + ' ' + '\'' + name + '\'' + end
@@ -505,11 +532,12 @@ def set_config_file_parameters(project_dir,num_classes,tensorflow_tile_size=(640
     for i in range(len(pipeline_config.train_config.data_augmentation_options)):
         pipeline_config.train_config.data_augmentation_options.pop()
     
-    d1 = pipeline_config.train_config.data_augmentation_options.add()
-    d1.random_vertical_flip.CopyFrom(preprocessor_pb2.RandomVerticalFlip()) 
-    
-    d1 = pipeline_config.train_config.data_augmentation_options.add()
-    d1.random_horizontal_flip.CopyFrom(preprocessor_pb2.RandomHorizontalFlip())  
+    if tensorflow_tile_size!=None:
+        d1 = pipeline_config.train_config.data_augmentation_options.add()
+        d1.random_vertical_flip.CopyFrom(preprocessor_pb2.RandomVerticalFlip()) 
+        
+        d1 = pipeline_config.train_config.data_augmentation_options.add()
+        d1.random_horizontal_flip.CopyFrom(preprocessor_pb2.RandomHorizontalFlip())  
     
     d1 = pipeline_config.train_config.data_augmentation_options.add()
     d1.random_adjust_brightness.CopyFrom(preprocessor_pb2.RandomAdjustBrightness())  
@@ -540,8 +568,8 @@ def print_labels(labels):
         None
     """
 
-    for key,value in labels.items():
-        print("    " + key + ": " + str(value))
+    for key in sorted(labels):
+        print("    " + key + ": " + str(labels[key]))
     
 
 pbar = None
@@ -552,7 +580,7 @@ def download_pretrained_model(project_folder, link):
     the pre-trained-model folder.
     
     Parameters:
-        project_folder (str): the project folder path
+        project_folder (str): the project folder pathw
         link (str): download link of the model
     Returns:
         None
@@ -615,7 +643,7 @@ if __name__== "__main__":
     
     
     #set tensorflow_tile_size to None if the images should not be resized
-    #tensorflow_tile_size = None
+    tensorflow_tile_size = None
         
     convert_annotation_folders(input_folders, test_splits,validation_splits, project_folder, tensorflow_tile_size=tensorflow_tile_size)
 
