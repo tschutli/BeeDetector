@@ -43,7 +43,7 @@ def detect_colors(working_dir,frame_queue,labels,progress_callback=None, pause_e
     for index,bee_image_path in enumerate(bee_image_paths):
         
         if index % 100 == 0:
-            progress_callback(index/len(bee_image_path),working_dir)
+            progress_callback(index/len(bee_image_paths),working_dir)
             
         if pause_event != None and pause_event.is_set():
             #TODO Maybe save intermediate state
@@ -62,6 +62,11 @@ def detect_colors(working_dir,frame_queue,labels,progress_callback=None, pause_e
 
         number_save_path = os.path.join(detected_numbers_path,os.path.basename(bee_image_path))
         [top,left,bottom,right] = best_detection["bounding_box"]
+        width, height = image.size
+        top = int(top*height)
+        bottom = int(bottom*height)
+        left = int(left*width)
+        right = int(right*width)
         cropped_image = image.crop((left, top, right, bottom))
         cropped_image.save(number_save_path,"PNG")
         frame_number = int(re.search('frame(.*)_detection', bee_image_path).group(1))
