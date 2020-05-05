@@ -109,6 +109,7 @@ def start(video_path, queue, working_dir, image_size=(640,480),progress_callback
         
         detections = get_detections(resized_image,queue,1)
         
+        '''
         if len(detections) > 0:
             #Save detection results, including image to folder (so that it can be edited in labelimg later.)
             annotation_folder = os.path.join(working_dir,"bee_annotations")
@@ -122,7 +123,7 @@ def start(video_path, queue, working_dir, image_size=(640,480),progress_callback
             cv2.imwrite(annotation_im_path,original_image)
             annotation_xml_path = os.path.join(annotation_folder,"min_" + minutes+ "_sec_" + seconds + "_frame_" + frame + ".xml")
             file_utils.save_annotations_to_xml(detections, annotation_im_path, annotation_xml_path)
-
+        '''
         
         detection_map[frame_number] = detections
         
