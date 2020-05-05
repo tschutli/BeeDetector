@@ -31,6 +31,11 @@ def hole_frame_reader(working_dir,frame_queue,image_size,progress_callback=None,
     if pause_event != None and pause_event.is_set():
         return
     
+    
+    if os.path.isfile(os.path.join(working_dir,"detected_holes.pkl")):
+        progress_callback(1.0,working_dir)
+        return
+
     progress_callback("Starting to detect holes", working_dir)
 
     
@@ -44,7 +49,6 @@ def hole_frame_reader(working_dir,frame_queue,image_size,progress_callback=None,
         progress_callback(index/len(all_images),working_dir)
 
         if pause_event != None and pause_event.is_set():
-            #TODO: pause gracefully. Save some intermediate results to continue later
             return
 
         
@@ -101,7 +105,7 @@ def hole_frame_reader(working_dir,frame_queue,image_size,progress_callback=None,
         detection_map = pickle.load(f)
 
     def is_id_in_frame(bee_id, frame_number):
-        if detection_map[frame_number] and detection_map[frame_number] != "Skipped":
+        if frame_number in detection_map and detection_map[frame_number] != "Skipped":
             for detection in detection_map[frame_number]:
                 if detection["id"] == bee_id:
                     return True

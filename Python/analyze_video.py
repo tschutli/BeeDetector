@@ -19,7 +19,7 @@ from threading import Event
 from concurrent.futures import ThreadPoolExecutor
 import hole_analysis
 import colors_detector
-
+import numbers_predictor
 
 
 current_milli_time = lambda: int(round(time.time() * 1000))
@@ -69,7 +69,7 @@ class ProgressHelper(object):
 
 
 
-def analyze_videos(trained_bee_model, trained_hole_model, trained_colors_model, input_videos, working_dir, visualize=True, progress_callback=None, pause_event=None):
+def analyze_videos(trained_bee_model, trained_hole_model, trained_colors_model, trained_numbers_model, input_videos, working_dir, visualize=True, progress_callback=None, pause_event=None):
     
     working_dirs = []
     for input_video in input_videos:
@@ -86,6 +86,7 @@ def analyze_videos(trained_bee_model, trained_hole_model, trained_colors_model, 
 
     detect_colors(trained_colors_model,working_dirs,progress_callback,pause_event)
     
+    detect_numbers(trained_numbers_model,working_dirs,progress_callback,pause_event)
     
     #TODO get statistics
     
@@ -96,17 +97,20 @@ def analyze_videos(trained_bee_model, trained_hole_model, trained_colors_model, 
         progress_callback("Success. All videos are analyzed.")
 
 
+def detect_numbers(trained_numbers_model,working_dirs,progress_callback=None,pause_event=None):
+    progress_helper = ProgressHelper(working_dirs,progress_callback,"detect_numbers")
+    numbers_predictor.start(trained_numbers_model,working_dirs,pause_event,progress_helper.control_progress_callback)
+
 
 def detect_colors(trained_colors_model,working_dirs,progress_callback=None,pause_event=None):
-    progress_helper = ProgressHelper(working_dirs,progress_callback,"detect_numbers")
+    progress_helper = ProgressHelper(working_dirs,progress_callback,"detect_colors")
+    
     
     frame_queue = queue.PriorityQueue()
     
     with ThreadPoolExecutor(max_workers=num_threads) as executor:
         futures = []
         for working_dir in working_dirs:
-            if os.path.isfile(os.path.join(working_dir,"detected_numbers.pkl")):
-                continue
             labels = ["green","white","yellow"]
             future = executor.submit(colors_detector.detect_colors,working_dir,frame_queue,labels,progress_helper.control_progress_callback, pause_event)
             
@@ -135,8 +139,6 @@ def detect_holes(trained_hole_model, input_videos, working_dirs,progress_callbac
     with ThreadPoolExecutor(max_workers=num_threads) as executor:
         futures = []
         for (input_video,working_dir) in zip(input_videos,working_dirs):
-            #if os.path.isfile(os.path.join(working_dir,"detected_holes.pkl")):
-            #    continue
             future = executor.submit(hole_analysis.hole_frame_reader,working_dir,frame_queue,image_size,progress_helper.control_progress_callback, pause_event)
             
             futures.append(future)
@@ -175,9 +177,6 @@ def detect_bees(trained_bee_model,input_videos,working_dirs, progress_callback=N
     with ThreadPoolExecutor(max_workers=num_threads) as executor:
         futures = []
         for (input_video,working_dir) in zip(input_videos,working_dirs):
-            if os.path.isfile(os.path.join(working_dir,"detection_map.pkl")):
-                progress_helper.control_progress_callback(1.0,input_video)
-                continue
             future = executor.submit(frame_reader.start, input_video, frame_queue, working_dir,image_size,progress_helper.control_progress_callback,pause_event)
             futures.append(future)
         
@@ -289,8 +288,12 @@ def visualize(input_video,detection_map,output_path,progress_callback=None, paus
                     end_point = detection["end"]
                     if end_point == None:
                         end_point = "?"
+                    
+                    if "color" in detection:
+                        bee_description = str(detection["color"]) + str(detection["number"]) + ": " + starting_point + " -> " + end_point
 
-                    bee_description = str(detection["id"]) + ": " + starting_point + " -> " + end_point
+                    else:
+                        bee_description = str(detection["id"]) + ": " + starting_point + " -> " + end_point
                     
                     cv2.putText(image, bee_description, (left, top-10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, rectangle_color, 2)
                     
@@ -316,11 +319,13 @@ if __name__== "__main__":
     def progress_callback(progress):
         print(progress)
     
+    pause_event = Event()
     bee_model_path = constants.bee_model_path
     hole_model_path = constants.hole_model_path
+    color_model_path = constants.color_model_path
     number_model_path = constants.number_model_path
     input_videos = constants.input_videos
     working_dir = constants.working_dir
-    analyze_videos(bee_model_path, hole_model_path, number_model_path, input_videos, working_dir,progress_callback=progress_callback)
+    analyze_videos(bee_model_path, hole_model_path, color_model_path, number_model_path, input_videos, working_dir,progress_callback=progress_callback,pause_event=pause_event)
     
     

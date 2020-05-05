@@ -77,9 +77,11 @@ def train(project_dir):
     print(score)
     results = model.predict(X_test)
     
-    print(np.max(results,axis=1))
-
-    results = np.argmax(results, axis = 1)
+    scores = np.max(results,axis=1)
+    labels = np.argmax(results, axis = 1) + 1 
+    for score, label, in zip(scores,labels):
+        print(score)
+        print(label)
     
     print(results)
 

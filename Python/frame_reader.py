@@ -34,11 +34,22 @@ def start(video_path, queue, working_dir, image_size=(640,480),progress_callback
     if pause_event != None and pause_event.is_set():
         return
 
+    detection_map = {}
+    
+    
+    #Reload checkpoint if existing
+    frame_number_before_interruption = 0
+    detection_map_file = os.path.join(working_dir,"detection_map.pkl")
+    checkpoint_file = os.path.join(working_dir,"interruption_checkpoint.pkl")
+    if os.path.isfile(checkpoint_file):
+        with open(checkpoint_file, 'rb') as f:
+            frame_number_before_interruption = pickle.load(f)
+    elif os.path.isfile(detection_map_file):
+        progress_callback(1.0,video_path)
+        return
     
     progress_callback("Starting to detect bees", video_path)
 
-    detection_map = {}
-    #TODO: Load existing detection_map
     
     last_24_frames = [None] * 24
     skip_counter = -1
@@ -68,16 +79,13 @@ def start(video_path, queue, working_dir, image_size=(640,480),progress_callback
             progress_callback(frame_number/no_of_frames,video_path)
             
             if pause_event != None and pause_event.is_set():
-                #TODO: pause gracefully. Save some intermediate results to continue later
+                with open(os.path.join(working_dir,"detection_map.pkl"), 'wb') as f:
+                    pickle.dump(detection_map,f)
+                with open(checkpoint_file, 'wb') as f:
+                    pickle.dump(frame_number,f)
+
                 cap.release()
                 return
-
-
-        cap_frame_number = cap.get(cv2.CAP_PROP_POS_FRAMES)
-        if cap_frame_number != frame_number:
-            print("ERROR")
-            print(cap_frame_number)
-            print(frame_number)
 
 
         
@@ -88,6 +96,8 @@ def start(video_path, queue, working_dir, image_size=(640,480),progress_callback
         
         last_24_frames[frame_number%24] = original_image
 
+        if frame_number<frame_number_before_interruption:
+            continue
         
         if skip_counter>=0 and skip_counter < 12:
             skip_counter += 1
@@ -151,7 +161,8 @@ def start(video_path, queue, working_dir, image_size=(640,480),progress_callback
     
     with open(os.path.join(working_dir,"detection_map.pkl"), 'wb') as f:
         pickle.dump(detection_map,f)
-
+    if os.path.isfile(checkpoint_file):
+        os.remove(checkpoint_file)
     # Release resources
     cap.release()
     progress_callback(1.0,video_path)
