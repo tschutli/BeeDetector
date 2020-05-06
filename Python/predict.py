@@ -240,18 +240,18 @@ def get_tensor_dict():
 
 if __name__ == '__main__':
     
-    train_dir = constants.train_dir
+    project_dir = constants.project_folder
 
-    images_to_predict = constants.images_to_predict
+    images_to_predict = project_dir + "/images/test"
     
     output_folder = constants.predictions_folder
     
     
     #size of tiles to feed into prediction network
-    tile_size = constants.tile_size
+    tile_size = constants.tensorflow_tile_size
     #minimum distance from edge of tile for prediction to be considered
     prediction_overlap = constants.prediction_overlap
 
-    predict(train_dir,images_to_predict,output_folder,tile_size,prediction_overlap)
+    predict(project_dir,images_to_predict,output_folder,tile_size)
 
     

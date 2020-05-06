@@ -48,12 +48,55 @@ def start(trained_model,working_dirs,stop_event,progress_callback):
             detection_map[frame_number][detection_number]["number_score"] = score
 
 
+        filter_numbers_and_colors(detection_map)
+        
         with open(os.path.join(working_dir,"detection_map.pkl"), 'wb') as f:
             pickle.dump(detection_map,f)
         progress_callback(1.0,working_dir)
         progress_callback("Done detecting numbers: ", working_dir)
 
 
+
+def filter_numbers_and_colors(detection_map):
+    
+    id2color = {}
+    id2number = {}
+    frame_number = 0
+    while frame_number in detection_map:
+        if detection_map[frame_number] and detection_map[frame_number] != "Skipped":
+            for detection in detection_map[frame_number]:
+                if "color" in detection and detection["color"] != None:
+                    bee_id = detection["id"]
+                    if not bee_id in id2color:
+                        id2color[bee_id] = []
+                        id2number[bee_id] = []
+                    id2color[bee_id].append((detection["color"],detection["color_score"]))
+                    id2number[bee_id].append((detection["number"],detection["number_score"]))
+        frame_number += 1
+    
+    def find_best_prediction(tuple_list):
+        sorted_by_score = sorted(tuple_list, key=lambda tup: tup[1],reverse=True)
+        print(sorted_by_score)
+        return sorted_by_score[0]
+                
+    for bee_id in id2color.keys():
+        id2color[bee_id] = find_best_prediction(id2color[bee_id])
+    
+    for bee_id in id2number.keys():
+        print(bee_id)
+        id2number[bee_id] = find_best_prediction(id2number[bee_id])
+
+        
+    frame_number = 0
+    while frame_number in detection_map:
+        if detection_map[frame_number] and detection_map[frame_number] != "Skipped":
+            for detection in detection_map[frame_number]:
+                bee_id = detection["id"]
+                if bee_id in id2color:
+                    detection["final_color"] = id2color[bee_id][0]
+                    detection["final_number"] = id2number[bee_id][0]
+                             
+        frame_number += 1
 
 def get_data(folder):
     all_images = file_utils.get_all_image_paths_in_folder(folder)
@@ -85,3 +128,4 @@ def get_model(trained_model):
     model.compile(optimizer = 'rmsprop', loss = 'categorical_crossentropy', metrics = ['acc'])
     
     model.load_weights(trained_model)
+    return model
