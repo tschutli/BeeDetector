@@ -19,12 +19,17 @@ import os
 
 def start(trained_model,working_dirs,stop_event,progress_callback):
     
+    
     model = get_model(trained_model)
 
 
     for working_dir in working_dirs:
         if stop_event.is_set():
             return
+        
+        if os.path.isfile(os.path.join(working_dir,"detected_numbers.pkl")):
+            continue
+
         progress_callback("Starting to detect numbers: ", working_dir)
 
         detection_map = {}

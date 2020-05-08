@@ -241,6 +241,9 @@ def visualize(input_video,detection_map,output_path,progress_callback=None, paus
 
 
     for frame_number in progressbar.progressbar(range(0,no_of_frames)):
+        
+        if frame_number > 16000:
+            break
     
         if frame_number % 100 == 0:
             progress_callback(frame_number/no_of_frames,input_video)
@@ -293,7 +296,7 @@ def visualize(input_video,detection_map,output_path,progress_callback=None, paus
                     
                     bee_description = str(detection["id"]) + ": " + starting_point + " -> " + end_point
 
-                    if "color" in detection:
+                    if "color" in detection and detection["color"] != None:
                         bee_description = str(detection["color"]) + '{0:.2f}'.format(detection["color_score"]) +" " + bee_description
                     
                     '''
@@ -305,8 +308,8 @@ def visualize(input_video,detection_map,output_path,progress_callback=None, paus
                     
 
         #print("3: " + str(current_milli_time()-start), flush=True)
-        #if detection_map[frame_number] != "Skipped":
-        out.write(image)
+        if detection_map[frame_number] != "Skipped":
+            out.write(image)
             #print("4: " + str(current_milli_time()-start), flush=True)
             #print("", flush=True)
 
