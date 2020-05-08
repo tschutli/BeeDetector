@@ -31,152 +31,75 @@ def hole_frame_reader(working_dir,frame_queue,image_size,progress_callback=None,
     if pause_event != None and pause_event.is_set():
         return
     
-    
-    if os.path.isfile(os.path.join(working_dir,"detected_holes.pkl")):
-        progress_callback(1.0,working_dir)
-        return
-
-    progress_callback("Starting to detect holes", working_dir)
-
-    
     hole_images_folder = os.path.join(working_dir,"frames_without_bees")
     all_images = file_utils.get_all_image_paths_in_folder(hole_images_folder)
-    
-    all_detections = []
-    num_holes_detected = []
-    for index,image_path in enumerate(all_images):
-        
-        progress_callback(index/len(all_images),working_dir)
-
-        if pause_event != None and pause_event.is_set():
-            return
-
-        
-        image = Image.open(image_path)
-        resized_image = image.resize(image_size)
-        image_np = np.asarray(resized_image)         
-        image_expand = np.expand_dims(image_np, 0)
-        is_done = Event()
-        detections_dict = {}
-        
-        queue_item = PrioritizedItem(1,(image_expand,detections_dict,is_done))
-        frame_queue.put(queue_item)
-        is_done.wait()
-        
-        detections = []
-        for i,score in enumerate(detections_dict['detection_scores']):
-            if score >= min_confidence_score:
-                top = detections_dict['detection_boxes'][i][0]
-                left = detections_dict['detection_boxes'][i][1]
-                bottom = detections_dict['detection_boxes'][i][2]
-                right = detections_dict['detection_boxes'][i][3]
-                #detection_class = detections_dict['detection_classes'][i]
-                detections.append({"bounding_box": [top,left,bottom,right], "score": float(score), "name": "hole"})
-        
-        detections = eval_utils.non_max_suppression(detections,0.5)
-        all_detections.append(detections)
-        num_holes_detected.append(len(detections))
-    most_frequent_answer = max(set(num_holes_detected), key = num_holes_detected.count)
-    index_of_most_frequent_answer = num_holes_detected.index(most_frequent_answer)
-        
-    holes = all_detections[index_of_most_frequent_answer]
 
     
+    #Only detect holes if detected_holes.pkl does not yet exist
+    if not os.path.isfile(os.path.join(working_dir,"detected_holes.pkl")):
 
-    '''
-    #TODO: Remove these three lines
-    holes = []
-    with open(os.path.join(working_dir,"detected_holes.pkl"), 'rb') as f:
-        holes = pickle.load(f)
-    '''
+        progress_callback("Starting to detect holes", working_dir)
     
-    print("Detected " + str(len(holes)) + " holes: " + os.path.basename(working_dir),flush=True)
-    
-    enumerate_holes(holes)
         
-    src_image = all_images[index_of_most_frequent_answer]
-    save_holes_predictions_image(holes,src_image,os.path.join(hole_images_folder,"detected_holes.jpg"))
-    file_utils.save_annotations_to_xml(holes, all_images[index_of_most_frequent_answer],  all_images[index_of_most_frequent_answer][:-4] + ".xml")
-
-    
-
-    detection_map = {}
-    with open(os.path.join(working_dir,"detection_map.pkl"), 'rb') as f:
-        detection_map = pickle.load(f)
-
-    def is_id_in_frame(bee_id, frame_number):
-        if frame_number in detection_map and detection_map[frame_number] != "Skipped":
-            for detection in detection_map[frame_number]:
-                if detection["id"] == bee_id:
-                    return True
-        return False
+        
+        all_detections = []
+        num_holes_detected = []
+        for index,image_path in enumerate(all_images):
             
-
+            progress_callback(index/len(all_images),working_dir)
     
-    starts = {}
-    ends = {}
+            if pause_event != None and pause_event.is_set():
+                return
     
-    frame_number = 0
-    while frame_number in detection_map:
+            
+            image = Image.open(image_path)
+            resized_image = image.resize(image_size)
+            image_np = np.asarray(resized_image)         
+            image_expand = np.expand_dims(image_np, 0)
+            is_done = Event()
+            detections_dict = {}
+            
+            queue_item = PrioritizedItem(1,(image_expand,detections_dict,is_done))
+            frame_queue.put(queue_item)
+            is_done.wait()
+            
+            detections = []
+            for i,score in enumerate(detections_dict['detection_scores']):
+                if score >= min_confidence_score:
+                    top = detections_dict['detection_boxes'][i][0]
+                    left = detections_dict['detection_boxes'][i][1]
+                    bottom = detections_dict['detection_boxes'][i][2]
+                    right = detections_dict['detection_boxes'][i][3]
+                    #detection_class = detections_dict['detection_classes'][i]
+                    detections.append({"bounding_box": [top,left,bottom,right], "score": float(score), "name": "hole"})
+            
+            detections = eval_utils.non_max_suppression(detections,0.5)
+            all_detections.append(detections)
+            num_holes_detected.append(len(detections))
+        most_frequent_answer = max(set(num_holes_detected), key = num_holes_detected.count)
+        index_of_most_frequent_answer = num_holes_detected.index(most_frequent_answer)
+            
+        holes = all_detections[index_of_most_frequent_answer]
+    
+            
+        print("Detected " + str(len(holes)) + " holes: " + os.path.basename(working_dir),flush=True)
         
-        if detection_map[frame_number] and detection_map[frame_number] != "Skipped":
-            for detection in detection_map[frame_number]:
-                bee_id = detection["id"]
-                [top,left,bottom,right] = detection["bounding_box"]
-                (center_x,center_y) = ((right+left)/2,(bottom+top)/2)
-
-                if bee_id == -1:
-                    continue
-                #check if the bee with bee_id was already present in the previous frame
-                if not is_id_in_frame(bee_id,frame_number-1):
-                    if detection["name"] == "bee":
-                        #Bee is sitting
-                        starts[bee_id] = get_hole_id_at_position(center_x,center_y,holes)
-
-                    else:
-                        starts[bee_id] = None
-                if not is_id_in_frame(bee_id,frame_number+1):
-                    if detection["name"] == "bee":
-                        #Bee is sitting
-                        ends[bee_id] = get_hole_id_at_position(center_x,center_y,holes)
-
-                    else:
-                        ends[bee_id] = None    
-        frame_number += 1
+        enumerate_holes(holes)
+            
+        src_image = all_images[index_of_most_frequent_answer]
+        save_holes_predictions_image(holes,src_image,os.path.join(hole_images_folder,"detected_holes.jpg"))
+        file_utils.save_annotations_to_xml(holes, all_images[index_of_most_frequent_answer],  all_images[index_of_most_frequent_answer][:-4] + ".xml")
     
-    frame_number = 0
-    while frame_number in detection_map:
         
-        if detection_map[frame_number] and detection_map[frame_number] != "Skipped":
-            for detection in detection_map[frame_number]:
-                bee_id = detection["id"]
-                if bee_id == -1:
-                    continue
-                detection["start"] = starts[bee_id]
-                detection["end"] = ends[bee_id]
-        frame_number += 1
+        with open(os.path.join(working_dir,"detected_holes.pkl"), 'wb') as f:
+            pickle.dump(holes,f)
         
-    print("Detected " + str(len(starts.keys())) + " flights: " + os.path.basename(working_dir))
-    
-    with open(os.path.join(working_dir,"detection_map.pkl"), 'wb') as f:
-        pickle.dump(detection_map,f)
-
-    with open(os.path.join(working_dir,"detected_holes.pkl"), 'wb') as f:
-        pickle.dump(holes,f)
-    
+        
     progress_callback(1.0,working_dir)
     progress_callback("Finished detecting holes",working_dir)
 
 
 
-
-    
-def get_hole_id_at_position(x,y,holes):
-    for hole in holes:
-        [top,left,bottom,right] = hole["bounding_box"]
-        if x<right and x>left and y<bottom and y>top:
-            return hole["id"]
-    return None
 
     
     

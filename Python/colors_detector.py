@@ -36,62 +36,77 @@ def detect_colors(working_dir,frame_queue,labels,progress_callback=None, pause_e
     detected_bees_folder = os.path.join(working_dir,"detected_bees")
     bee_image_paths = file_utils.get_all_image_paths_in_folder(detected_bees_folder)
     
-    detection_map = {}
-    with open(os.path.join(working_dir,"detection_map.pkl"), 'rb') as f:
-        detection_map = pickle.load(f)
+    
 
-    progress_callback("Starting to detect colors: " + working_dir,working_dir)
+    detected_colors_path=os.path.join(working_dir,"detected_colors.pkl")
 
-
-    for index,bee_image_path in enumerate(bee_image_paths):
+    if not os.path.isfile(detected_colors_path):
         
-        if index % 100 == 0:
-            progress_callback(index/len(bee_image_paths),working_dir)
+        
+        detected_colors = {}
+
+        #Reload checkpoint if existing
+        detected_colors_partial_path=os.path.join(working_dir,"detected_colors_partial.pkl")
+        if os.path.isfile(detected_colors_partial_path):
+            with open(detected_colors_partial_path, 'rb') as f:
+                detected_colors = pickle.load(f)        
+        else:
+            #Otherwise load the detected_bees map
+            detected_bees_file = os.path.join(working_dir,"detected_bees.pkl")
+            with open(detected_bees_file, 'rb') as f:
+                detected_colors = pickle.load(f)
+
+    
+        progress_callback("Starting to detect colors: " + working_dir,working_dir)
+    
+    
+        for index,bee_image_path in enumerate(bee_image_paths):
             
-        if pause_event != None and pause_event.is_set():
-            with open(os.path.join(working_dir,"detection_map.pkl"), 'wb') as f:
-                pickle.dump(detection_map,f)
-            return
-
-        frame_number = int(re.search('frame(.*)_detection', bee_image_path).group(1))
-        detection_number = int(re.search('_detection(.*).png', bee_image_path).group(1))
-        
-        if "color" in detection_map[frame_number][detection_number]:
-            #this detection has already been processed
-            continue
-
-
-        image = Image.open(bee_image_path)
-        detections = get_detections(image,frame_queue,1,labels)
-        
-
-        
-        if len(detections) == 0:
-            detection_map[frame_number][detection_number]["color"] = None
-            detection_map[frame_number][detection_number]["color_score"] = 0.0
-            continue
-        
-        best_detection = detections[0]
-        for detection in detections:
-            if detection["score"] > best_detection["score"]:
-                best_detection = detection
-        
-
-        number_save_path = os.path.join(detected_numbers_path,os.path.basename(bee_image_path))
-        [top,left,bottom,right] = best_detection["bounding_box"]
-        width, height = image.size
-        top = int(top*height)
-        bottom = int(bottom*height)
-        left = int(left*width)
-        right = int(right*width)
-        cropped_image = image.crop((left, top, right, bottom))
-        cropped_image.save(number_save_path,"PNG")
-        detection_map[frame_number][detection_number]["color"] = best_detection["name"]
-        detection_map[frame_number][detection_number]["color_score"] = best_detection["score"]
+            frame_number = int(re.search('frame(.*)_detection', bee_image_path).group(1))
+            detection_number = int(re.search('_detection(.*).png', bee_image_path).group(1))
             
+            if "color" in detected_colors[frame_number][detection_number]:
+                continue
+                
+            
+            if index % 100 == 0:
+                progress_callback(index/len(bee_image_paths),working_dir)
+                with open(detected_colors_partial_path, 'wb') as f:
+                    pickle.dump(detected_colors,f)
+                if pause_event != None and pause_event.is_set():
+                    return
 
-    with open(os.path.join(working_dir,"detection_map.pkl"), 'wb') as f:
-        pickle.dump(detection_map,f)
+    
+            image = Image.open(bee_image_path)
+            detections = get_detections(image,frame_queue,1,labels)
+            
+            
+            if len(detections) == 0:
+                detected_colors[frame_number][detection_number]["color"] = None
+                detected_colors[frame_number][detection_number]["color_score"] = 0.0
+                continue
+            
+            best_detection = detections[0]
+            for detection in detections:
+                if detection["score"] > best_detection["score"]:
+                    best_detection = detection
+            
+    
+            number_save_path = os.path.join(detected_numbers_path,os.path.basename(bee_image_path))
+            [top,left,bottom,right] = best_detection["bounding_box"]
+            width, height = image.size
+            top = int(top*height)
+            bottom = int(bottom*height)
+            left = int(left*width)
+            right = int(right*width)
+            cropped_image = image.crop((left, top, right, bottom))
+            cropped_image.save(number_save_path,"PNG")
+            detected_colors[frame_number][detection_number]["color"] = best_detection["name"]
+            detected_colors[frame_number][detection_number]["color_score"] = best_detection["score"]
+                
+    
+        with open(detected_colors_path, 'wb') as f:
+            pickle.dump(detected_colors,f)
     
     progress_callback(1.0,working_dir)
     progress_callback("Done detecting colors: " + working_dir,working_dir)

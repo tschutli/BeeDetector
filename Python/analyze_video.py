@@ -20,7 +20,7 @@ from concurrent.futures import ThreadPoolExecutor
 import hole_analysis
 import colors_detector
 import numbers_predictor
-
+import extract_stats
 
 current_milli_time = lambda: int(round(time.time() * 1000))
 
@@ -87,6 +87,8 @@ def analyze_videos(trained_bee_model, trained_hole_model, trained_colors_model, 
     detect_colors(trained_colors_model,working_dirs,progress_callback,pause_event)
     
     detect_numbers(trained_numbers_model,working_dirs,progress_callback,pause_event)
+    
+    extract_stats.extract_stats(working_dirs)
     
     #TODO get statistics
     
@@ -207,7 +209,7 @@ def visualize_videos(input_videos,working_dirs,progress_callback=None, pause_eve
         
         for (input_video,working_dir) in zip(input_videos,working_dirs):
             detection_map = {}
-            with open(os.path.join(working_dir,"detection_map.pkl"), 'rb') as f:
+            with open(os.path.join(working_dir,"combined_detections.pkl"), 'rb') as f:
                 detection_map = pickle.load(f)
             
             future = executor.submit(visualize, input_video, detection_map, os.path.join(working_dir,"visualization.MP4"),progress_helper.control_progress_callback,pause_event)
@@ -220,13 +222,13 @@ def visualize_videos(input_videos,working_dirs,progress_callback=None, pause_eve
     
 
 
-def visualize(input_video,detection_map,output_path,progress_callback=None, pause_event=None):
+def visualize(input_video,detection_map,output_path,progress_callback=None, pause_event=None,image_size=(1024,578)):
     #start = current_milli_time()
     #cap = cv2.VideoCapture(input_video)
     #cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
     if pause_event != None and pause_event.is_set():
         return
-
+    
     
     progress_callback("Starting Visualization of video", input_video)
 
@@ -268,20 +270,20 @@ def visualize(input_video,detection_map,output_path,progress_callback=None, paus
         
         if detection_map[frame_number] and detection_map[frame_number] != "Skipped":
             for detection in detection_map[frame_number]:
+                [top,left,bottom,right] = detection["bounding_box"]
+                top = int(top*image_size[1])
+                bottom = int(bottom*image_size[1])
+                left = int(left*image_size[0])
+                right = int(right*image_size[0])
+                rectangle_color = (0,0,255)
+                if(detection["name"] == "bee"):
+                    rectangle_color = (0,255,0)
+                elif(detection["name"] == "bee flying"):
+                    rectangle_color = (255,0,0)      
+                
+                image = cv2.rectangle(image, (left,top), (right,bottom), rectangle_color, 2)
+                
                 if detection["id"] != -1:
-                    [top,left,bottom,right] = detection["bounding_box"]
-                    top = int(top*image_size[1])
-                    bottom = int(bottom*image_size[1])
-                    left = int(left*image_size[0])
-                    right = int(right*image_size[0])
-                    rectangle_color = (0,0,255)
-                    if(detection["name"] == "bee"):
-                        rectangle_color = (0,255,0)
-                    elif(detection["name"] == "bee flying"):
-                        rectangle_color = (255,0,0)      
-                    
-                    image = cv2.rectangle(image, (left,top), (right,bottom), rectangle_color, 2)
-                    
                     starting_point = detection["start"]
                     if starting_point == None:
                         starting_point = "?"
@@ -289,11 +291,15 @@ def visualize(input_video,detection_map,output_path,progress_callback=None, paus
                     if end_point == None:
                         end_point = "?"
                     
-                    if "color" in detection:
-                        bee_description = str(detection["color"]) + str(detection["number"]) + ": " + starting_point + " -> " + end_point
+                    bee_description = str(detection["id"]) + ": " + starting_point + " -> " + end_point
 
-                    else:
-                        bee_description = str(detection["id"]) + ": " + starting_point + " -> " + end_point
+                    if "color" in detection:
+                        bee_description = str(detection["color"]) + '{0:.2f}'.format(detection["color_score"]) +" " + bee_description
+                    
+                    '''
+                    if "number" in detection:
+                        bee_description = str(detection["number"]) + '{0:.2f}'.format(detection["number_score"]) + " " + bee_description
+                    '''
                     
                     cv2.putText(image, bee_description, (left, top-10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, rectangle_color, 2)
                     
