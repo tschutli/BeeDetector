@@ -40,6 +40,7 @@ import urllib.request
 import tarfile
 import shutil
 from object_detection.protos import preprocessor_pb2
+import pickle
 
 
 
@@ -108,7 +109,7 @@ def convert_annotation_folders(input_folders, test_splits, validation_splits, pr
             
             #copying the image along with annotations to the train directory
             if tensorflow_tile_size == None:
-                rot_angles = [0,90,180,270]
+                rot_angles = [0]
             else:
                 rot_angles = [0]
             
@@ -129,7 +130,12 @@ def convert_annotation_folders(input_folders, test_splits, validation_splits, pr
                     image = image.rotate(rot_angle,expand=True)
                     image.save(dest_image_path)
                     
-    
+                    '''
+                    for annotation in annotations:
+                        [top,left,bottom,right] = annotation["bounding_box"]
+                        num_image = image.crop((left, top, right, bottom)) 
+                        num_image.save(dest_image_path)
+                    '''
 
                 dest_xml_path = dest_image_path[:-4] + ".xml"
 
@@ -222,7 +228,11 @@ def resize_image(image_path,dest_image_path,annotations,size=None):
 def filter_annotations(annotations,labels):
     for annotation in annotations:
         #Remove all spaces
-        filtered_name = annotation["name"].rstrip()
+        #filtered_name = annotation["name"].rstrip()
+        #Remove all spaces and numbers from annotation name
+        #filtered_name = ''.join(x for x in annotation["name"] if x.isdigit()).rstrip()
+        filtered_name = ''.join(x for x in annotation["name"] if not x.isdigit()).rstrip()
+
         annotation["name"] = filtered_name        
         
         add_label_to_labelcount(filtered_name, labels)
@@ -349,7 +359,10 @@ def write_labels_to_labelmapfile(labels, output_path):
     """
 
         
-    
+    output_pkl = os.path.join(output_path,"label_map.pkl")
+    with open(output_pkl, 'wb') as f:
+        pickle.dump(sorted(labels), f, pickle.HIGHEST_PROTOCOL)
+
     output_name = os.path.join(output_path, "label_map.pbtxt")
     end = '\n'
     s = ' '
