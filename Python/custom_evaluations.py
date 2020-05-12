@@ -22,6 +22,7 @@ import numpy as np
 from object_detection.utils import object_detection_evaluation
 from object_detection.core import standard_fields
 from utils import eval_utils
+import pandas as pd
 
 
 
@@ -52,6 +53,9 @@ def evaluate(project_folder, input_folder, output_folder,iou_threshold=constants
     (flower_names,labelmap) = get_flower_names_from_labelmap(PATH_TO_LABELS)
     object_detection_evaluator = object_detection_evaluation.ObjectDetectionEvaluator(labelmap, matching_iou_threshold=iou_threshold,evaluate_precision_recall=True,use_weighted_mean_ap=False)
     confusion_matrix = np.zeros(shape=(len(flower_names) + 1, len(flower_names) + 1))
+    log_file = os.path.join(output_folder,"results.txt")
+    if os.path.exists(log_file):
+        os.remove(log_file)
 
     stats = {}
     for flower_name in flower_names:
@@ -62,19 +66,20 @@ def evaluate(project_folder, input_folder, output_folder,iou_threshold=constants
     for i in progressbar.progressbar(range(len(images))):
         image_path = images[i]
         
-        predictions_path = image_path[:-4] + "_predictions.json"
-        ground_truth_path = image_path[:-4] + "_ground_truth.json"
+        predictions_path = image_path[:-4] + ".xml"
+        ground_truth_path = image_path[:-4] + "_ground_truth.xml"
         
-        predictions = file_utils.read_json_file(predictions_path)
-        ground_truths = file_utils.read_json_file(ground_truth_path)
+        
+        predictions = file_utils.get_annotations_from_xml(predictions_path)
+        ground_truths = file_utils.get_annotations_from_xml(ground_truth_path)
         
         if predictions == None:
             predictions = []
         if ground_truths == None:
             ground_truths = []
-
         ground_truths = filter_ground_truth(ground_truths,flower_names)
         predictions = filter_predictions(predictions,min_score)
+        print(flower_names)
         #predictions = eval_utils.non_max_suppression(predictions,0.3)
         
         for gt in ground_truths:
@@ -210,18 +215,19 @@ def evaluate(project_folder, input_folder, output_folder,iou_threshold=constants
         stat_overall["fp"] += stat["fp"]
         stat_overall["fn"] += stat["fn"]
         stat["mAP"] = tensorflow_evaluations["PerformanceByCategory/AP@" +str(iou_threshold)+"IOU/b'" + flower_name + "'"]
-        print_stats(stat,flower_name)
+        print_stats(stat,flower_name,log_file)
 
-    print_stats(stat_overall,"Overall")
+    print_stats(stat_overall,"Overall",log_file)
     
     if should_print_confusion_matrix:
-        print_confusion_matrix(confusion_matrix,labelmap)
+        print_confusion_matrix(confusion_matrix,labelmap,log_file)
+        print(confusion_matrix)
     
     stats["overall"] = stat_overall
     return stats
 
 
-def print_confusion_matrix(confusion_matrix, categories, percentage=True):
+def print_confusion_matrix(confusion_matrix, categories, log_file, percentage=True):
     """
     Prints the confusion matrix to the console in latex format
     
@@ -233,8 +239,6 @@ def print_confusion_matrix(confusion_matrix, categories, percentage=True):
         None
     """
     
-    
-    
 
     def short_name(name):
         if " " in name:
@@ -244,21 +248,31 @@ def print_confusion_matrix(confusion_matrix, categories, percentage=True):
         else:
             return name
     
-    print("\nConfusion Matrix:")
     categories = sorted(categories, key = lambda i: i['name'])
     categories.append({"id":0, "name":"background"})
+    
+    cat_names = []
+    for cat in categories:
+        cat_names.append(cat["name"])
+    
+    log("\nConfusion Matrix:", log_file)
+    df = pd.DataFrame(confusion_matrix, columns=cat_names, index=cat_names)
+    log(str(df),log_file)
+    
     
     '''
     for category in categories:
         if category["id"] == 15 or category["id"] == 16:
             categories.remove(category)
     '''        
-            
+    
+    log("\nConfusion Matrix Latex Format:", log_file)
+  
     top_line = ""
     for category in categories:
         top_line += " & \\rotatebox[origin=c]{90}{\\textbf{" + short_name(category["name"]) + "}}"
-    print(top_line + "\\\\")
-    print("\\hline")
+    log(top_line + "\\\\",log_file)
+    log("\\hline",log_file)
     
     
     for category_side in categories:
@@ -300,14 +314,14 @@ def print_confusion_matrix(confusion_matrix, categories, percentage=True):
             
             
         line_string += " \\\\"
-        print(line_string)
+        log(line_string,log_file)
 
     
 
 
         
 
-def print_stats(stat, flower_name, print_latex_format = False):
+def print_stats(stat, flower_name, log_file, print_latex_format = False):
     """
     Prints precision, recall, mAP, f1, TP, FP and FN to the console
     
@@ -347,14 +361,23 @@ def print_stats(stat, flower_name, print_latex_format = False):
             precision = 0
         if f1 == "-":
             f1 = 0
-        print(short_name(flower_name) + " & " + str(n) + " & " + str(round(precision*100,1)) + " \\% & " + str(round(recall*100,1)) + " \\% & " + str(round(stat["mAP"],3)) + " & " + str(round(f1,3)) + " \\\\" )
+        log(short_name(flower_name) + " & " + str(n) + " & " + str(round(precision*100,1)) + " \\% & " + str(round(recall*100,1)) + " \\% & " + str(round(stat["mAP"],3)) + " & " + str(round(f1,3)) + " \\\\", log_file)
     else:
-        print(flower_name + " (n=" + str(n) + "):")
-        print("   precision: " + str(precision))
-        print("   recall: " + str(recall))
-        print("   mAP: " + str(stat["mAP"]))
-        print("   f1: " + str(f1))
-        print("   TP: " + str(stat["tp"]) + " FP: " + str(stat["fp"]) + " FN: " + str(stat["fn"]))
+       
+        log(flower_name + " (n=" + str(n) + "):",log_file)
+        log("   precision: " + str(precision),log_file)
+        log("   recall: " + str(recall),log_file)
+        log("   mAP: " + str(stat["mAP"]),log_file)
+        log("   f1: " + str(f1),log_file)
+        log("   TP: " + str(stat["tp"]) + " FP: " + str(stat["fp"]) + " FN: " + str(stat["fn"]),log_file)
+
+
+def log(line,log_file):
+    
+    with open(log_file, "a") as logger:
+        # Append 'hello' at the end of file
+        logger.write(line + "\n")
+    print(line)
 
         
 def filter_ground_truth(ground_truths, flower_names):

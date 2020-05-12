@@ -14,42 +14,127 @@ from keras import backend as K
 from keras.models import load_model
 from keras.layers import Input
 from PIL import Image, ImageFont, ImageDraw
-
+from object_detection.utils import visualization_utils
 from yolo3.model import yolo_eval, yolo_body, tiny_yolo_body
 from yolo3.utils import letterbox_image
 import os
 from keras.utils import multi_gpu_model
 from utils import file_utils
 import time
+import progressbar
+current_milli_time = lambda: int(round(time.time() * 1000))
+import tensorflow as tf
+import statistics
+import queue
+from dataclasses import dataclass, field
+from typing import Any
+from utils import constants
+
+@dataclass(order=True)
+class PrioritizedItem:
+    priority: int
+    item: Any=field(compare=False)
 
 current_milli_time = lambda: int(round(time.time() * 1000))
 
 
+def start(trained_model,frame_queue,stop_event):
+    
+    stats = []
+    stats_wait = []
+
+    yolo = YOLO(model_path=trained_model)
 
 
-def predict(model_path):
+
+    while not stop_event.is_set():
+        start = current_milli_time()
+        try:
+            (image_expand,image_size,detections,is_done) = frame_queue.get(timeout = 1).item
+            
+            stats_wait.append(current_milli_time()-start)
+
+
+            start = current_milli_time()
+            out_boxes,out_scores,out_classes = yolo.detect_fast(image_size,image_expand)
+            detections["detection_boxes"] = out_boxes
+            detections["detection_scores"] = out_scores
+            detections["detection_classes"] = out_classes
+            is_done.set()
+            stats.append(current_milli_time()-start)
+            
+            if len(stats)%100 == 0:
+                print("median_predict: " + str(statistics.median(stats)))
+                print("median_wait: " + str(statistics.median(stats_wait)))
+        
+        except queue.Empty:
+            continue
+            
+        
+    print("Quitting prediction Thread")
+
+
+
+def predict(model_path,images_to_predict,output_folder,classes,visualize_groundtruths=False,visualize_predictions=True,visualize_scores=True,visualize_names=True):
     
-    yolo = YOLO()
+    yolo = YOLO(model_path=model_path)
     
-    all_images = file_utils.get_all_image_paths_in_folder("C:/Users/johan/Desktop/test_proj_folder/images/train/")
+    all_images = file_utils.get_all_image_paths_in_folder(images_to_predict)
     
-    for image_path in all_images:
-        print(image_path)
+    for image_path in progressbar.progressbar(all_images):
+        
         image = Image.open(image_path)
-        image = yolo.detect_image(image)
+        width,height= image.size
+        out_boxes,out_scores,out_classes = yolo.detect_image(image)
     
+        detections = []
+                
+        for box,score,clazz in zip(out_boxes,out_scores,out_classes):
+            top = round(box[0])
+            left = round(box[1])
+            bottom = round(box[2])
+            right = round(box[3])
+            detections.append({"bounding_box": [top,left,bottom,right], "score": float(score), "name": classes[clazz]})
 
+        predictions_out_path = os.path.join(output_folder, os.path.basename(image_path)[:-4] + ".xml")
+        file_utils.save_annotations_to_xml(detections, image_path, predictions_out_path)
+        
+        
+        #copy the ground truth annotations to the output folder if there is any ground truth
+        ground_truth = get_ground_truth_annotations(image_path)
+        if ground_truth:
+            #draw ground truth
+            if visualize_groundtruths:
+                for detection in ground_truth:
+                    [top,left,bottom,right] = detection["bounding_box"]
+                    col = "black"
+                    visualization_utils.draw_bounding_box_on_image(image,top,left,bottom,right,display_str_list=(),thickness=1, color=col, use_normalized_coordinates=False)          
 
+            ground_truth_out_path = os.path.join(output_folder, os.path.basename(image_path)[:-4] + "_ground_truth.xml")
+            file_utils.save_annotations_to_xml(ground_truth,image_path,ground_truth_out_path)
+        
 
-
+        for detection in detections:
+            if visualize_predictions:
+                col = 'LightCyan'
+                [top,left,bottom,right] = detection["bounding_box"]
+                score_string = str('{0:.2f}'.format(detection["score"]))
+                vis_string_list = []
+                if visualize_scores:
+                    vis_string_list.append(score_string)
+                if visualize_names:
+                    vis_string_list.append(detection["name"])                            
+                visualization_utils.draw_bounding_box_on_image(image,top,left,bottom,right,display_str_list=vis_string_list,thickness=1, color=col, use_normalized_coordinates=False)          
+        
+        if visualize_groundtruths or visualize_predictions:
+            image_output_path = os.path.join(output_folder, os.path.basename(image_path))
+            image.save(image_output_path)
 
 
 
 class YOLO(object):
     _defaults = {
-        "model_path": 'C:/Users/johan/Downloads/ep037-loss17.009-val_loss15.844.h5',
-        "anchors_path": 'model_data/yolo_anchors.txt',
-        "classes_path": 'model_data/coco_classes.txt',
+        "model_path": 'C:/Users/johan/Downloadds/ep037-loss17.009-val_loss15.844.h5',
         "score" : 0.3,
         "iou" : 0.45,
         "model_image_size" : (320, 320),
@@ -120,9 +205,9 @@ class YOLO(object):
                 score_threshold=self.score, iou_threshold=self.iou)
         return boxes, scores, classes
 
-    def detect_image(self, image):
-        start = timer()
 
+    def detect_fast(self,image_size,image_expand):
+        '''
         if self.model_image_size != (None, None):
             assert self.model_image_size[0]%32 == 0, 'Multiples of 32 required'
             assert self.model_image_size[1]%32 == 0, 'Multiples of 32 required'
@@ -136,7 +221,37 @@ class YOLO(object):
         print(image_data.shape)
         image_data /= 255.
         image_data = np.expand_dims(image_data, 0)  # Add batch dimension.
-        start = current_milli_time()
+        '''
+        
+        out_boxes, out_scores, out_classes = self.sess.run(
+            [self.boxes, self.scores, self.classes],
+            feed_dict={
+                self.yolo_model.input: image_expand,
+                self.input_image_shape: [image_size[1], image_size[0]],
+                K.learning_phase(): 0
+            })
+        
+        return out_boxes,out_scores,out_classes
+
+    
+    
+    def detect_image(self, image):
+        start = timer()
+
+        if self.model_image_size != (None, None):
+            assert self.model_image_size[0]%32 == 0, 'Multiples of 32 required'
+            assert self.model_image_size[1]%32 == 0, 'Multiples of 32 required'
+            boxed_image = letterbox_image(image, tuple(reversed(self.model_image_size)))
+        else:
+            new_image_size = (image.width - (image.width % 32),
+                              image.height - (image.height % 32))
+            boxed_image = letterbox_image(image, new_image_size)
+        image_data = np.array(boxed_image, dtype='float32')
+
+        image_data /= 255.
+        image_data = np.expand_dims(image_data, 0)  # Add batch dimension.
+        
+        
         out_boxes, out_scores, out_classes = self.sess.run(
             [self.boxes, self.scores, self.classes],
             feed_dict={
@@ -145,13 +260,11 @@ class YOLO(object):
                 K.learning_phase(): 0
             })
         
-        print("time: " + str(current_milli_time()-start), flush=True)
-
-        print('Found {} boxes for {}'.format(len(out_boxes), 'img'))
-        print(out_boxes)
-        print(out_scores)
-        print(out_classes)
-        return
+        return out_boxes,out_scores,out_classes
+    
+    
+    
+    
         font = ImageFont.truetype(font='font/FiraMono-Medium.otf',
                     size=np.floor(3e-2 * image.size[1] + 0.5).astype('int32'))
         thickness = (image.size[0] + image.size[1]) // 300
@@ -195,9 +308,29 @@ class YOLO(object):
     def close_session(self):
         self.sess.close()
 
+def get_ground_truth_annotations(image_path):
+    """Reads the ground_thruth information from either the tablet annotations (imagename_annotations.json),
+        the LabelMe annotations (imagename.json) or tensorflow xml format annotations (imagename.xml)
+
+    Parameters:
+        image_path (str): path to the image of which the annotations should be read
+    
+    Returns:
+        list: a list containing all annotations corresponding to that image.
+            Returns the None if no annotation file is present
+    """
+    ground_truth = file_utils.get_annotations(image_path)
+    if len(ground_truth) == 0:                     
+        return None
+    return ground_truth
 
 
 
 if __name__== "__main__":
     
-    predict("")
+    model_path = constants.color_model_path
+    images_to_predict = constants.project_folder + "/images/train"
+    output_folder = constants.predictions_folder
+    classes = ["green","white","yellow"]
+    
+    predict(model_path,images_to_predict,output_folder,classes)
