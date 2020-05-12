@@ -17,7 +17,7 @@ import pickle
 import re
 import os
 
-image_size=32
+image_size=50
 
 def start(trained_model,working_dirs,stop_event,progress_callback):
     
@@ -81,7 +81,7 @@ def get_data(folder,rgb=True):
             image = image.convert('L')
             np_image = np.asarray(image).reshape(image_size,image_size,1)
         X[index] = np_image
-    return X
+    return X/255.
 
     
 

@@ -21,6 +21,7 @@ import hole_analysis
 import colors_detector
 import numbers_predictor
 import extract_stats
+import yolo_predictor
 
 current_milli_time = lambda: int(round(time.time() * 1000))
 
@@ -120,7 +121,7 @@ def detect_colors(trained_colors_model,working_dirs,progress_callback=None,pause
         
         
         predictor_stop_event = Event()
-        predictor_thread = threading.Thread(target=predictor.start,args=(trained_colors_model,frame_queue,predictor_stop_event,))
+        predictor_thread = threading.Thread(target=yolo_predictor.start,args=(trained_colors_model,frame_queue,predictor_stop_event,))
         predictor_thread.daemon=True
         predictor_thread.start()
         
@@ -239,10 +240,10 @@ def visualize(input_video,detection_map,output_path,progress_callback=None, paus
 
     no_of_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
 
-
+    frame_number = 0
     for frame_number in progressbar.progressbar(range(0,no_of_frames)):
         
-        if frame_number > 16000:
+        if frame_number > 200000: 
             break
     
         if frame_number % 100 == 0:
@@ -280,7 +281,7 @@ def visualize(input_video,detection_map,output_path,progress_callback=None, paus
                 right = int(right*image_size[0])
                 rectangle_color = (0,0,255)
                 if(detection["name"] == "bee"):
-                    rectangle_color = (0,255,0)
+                    rectangle_color = (0,0,255)
                 elif(detection["name"] == "bee flying"):
                     rectangle_color = (255,0,0)      
                 
@@ -294,22 +295,26 @@ def visualize(input_video,detection_map,output_path,progress_callback=None, paus
                     if end_point == None:
                         end_point = "?"
                     
-                    bee_description = str(detection["id"]) + ": " + starting_point + " -> " + end_point
-
-                    if "color" in detection and detection["color"] != None:
-                        bee_description = str(detection["color"]) + '{0:.2f}'.format(detection["color_score"]) +" " + bee_description
-                    
-                    '''
-                    if "number" in detection:
-                        bee_description = str(detection["number"]) + '{0:.2f}'.format(detection["number_score"]) + " " + bee_description
-                    '''
-                    
-                    cv2.putText(image, bee_description, (left, top-10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, rectangle_color, 2)
-                    
+                    if starting_point != "?" or end_point != "?":
+                        bee_description = starting_point + " -> " + end_point
+    
+                        '''
+                        if "color" in detection and detection["color"] != None:
+                            bee_description = str(detection["color"]) + '{0:.2f}'.format(detection["color_score"]) +" " + bee_description
+                        
+                        if "number" in detection:
+                            bee_description = str(detection["number"]) + '{0:.2f}'.format(detection["number_score"]) + " " + bee_description
+                        '''
+                        if "final_color" in detection and "final_number" in detection:
+                            bee_description = str(detection["final_color"]) + str(detection["final_number"]) + ": " + bee_description
+                         cv2.putText(image, bee_description, (left, top-10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, rectangle_color, 2)
+                        
+                        
+                        
 
         #print("3: " + str(current_milli_time()-start), flush=True)
-        if detection_map[frame_number] != "Skipped":
-            out.write(image)
+        #if detection_map[frame_number] != "Skipped":
+        out.write(image)
             #print("4: " + str(current_milli_time()-start), flush=True)
             #print("", flush=True)
 

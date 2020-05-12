@@ -15,6 +15,9 @@ from threading import Event
 from utils import eval_utils
 import pickle
 import re
+import extract_stats
+from yolo3.utils import letterbox_image
+
 
 @dataclass(order=True)
 class PrioritizedItem:
@@ -56,6 +59,10 @@ def detect_colors(working_dir,frame_queue,labels,progress_callback=None, pause_e
             with open(detected_bees_file, 'rb') as f:
                 detected_colors = pickle.load(f)
 
+        
+        extract_stats.enumerate_bee_detections(detected_colors,working_dir,image_size=(3840,2160))
+        
+        extract_stats.apply_holes_to_bee_detections(detected_colors,working_dir,image_size=(3840,2160))
     
         progress_callback("Starting to detect colors: " + working_dir,working_dir)
     
@@ -75,10 +82,20 @@ def detect_colors(working_dir,frame_queue,labels,progress_callback=None, pause_e
                     pickle.dump(detected_colors,f)
                 if pause_event != None and pause_event.is_set():
                     return
+            
+            if detected_colors[frame_number][detection_number]["id"] == -1:
+                continue
 
-    
+            if detected_colors[frame_number][detection_number]["start"] == None and detected_colors[frame_number][detection_number]["end"] == None:
+                continue
+            
+            if detected_colors[frame_number][detection_number]["start"] == detected_colors[frame_number][detection_number]["end"]:
+                continue
+
+            
+            
             image = Image.open(bee_image_path)
-            detections = get_detections(image,frame_queue,1,labels)
+            detections = get_detections_yolo(image,frame_queue,1,labels)
             
             
             if len(detections) == 0:
@@ -112,14 +129,41 @@ def detect_colors(working_dir,frame_queue,labels,progress_callback=None, pause_e
     progress_callback("Done detecting colors: " + working_dir,working_dir)
 
         
-        
+
+def get_detections_yolo(image,queue,priority,labels,min_confidence_score = 0.3):
+    
+    model_image_size=(320,320)
+    boxed_image = letterbox_image(image, tuple(reversed(model_image_size)))
+    image_data = np.array(boxed_image, dtype='float32')
+    image_data /= 255.
+    image_expand = np.expand_dims(image_data, 0)  # Add batch dimension.
+    
+    is_done = Event()
+    detections_dict = {}
+    queue_item = PrioritizedItem(1/priority,(image_expand,image.size,detections_dict,is_done))
+    queue.put(queue_item)
+    is_done.wait()
+
+    detections = []
+    width,height=image.size
+    for box,score,clazz in zip(detections_dict["detection_boxes"],detections_dict["detection_scores"],detections_dict["detection_classes"]):
+        top = box[0]/height
+        left = box[1]/width
+        bottom = box[2]/height
+        right = box[3]/width
+        detections.append({"bounding_box": [top,left,bottom,right], "score": float(score), "name": labels[clazz]})
+    
+    detections = eval_utils.non_max_suppression(detections,0.5)
+    return detections
+
+    
         
 def get_detections(image,queue,priority,labels,min_confidence_score = 0.5):
     image_np = np.asarray(image)         
     image_expand = np.expand_dims(image_np, 0)
+    
     is_done = Event()
     detections_dict = {}
-    
     queue_item = PrioritizedItem(1/priority,(image_expand,detections_dict,is_done))
     queue.put(queue_item)
     is_done.wait()

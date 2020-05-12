@@ -330,7 +330,9 @@ if __name__== "__main__":
     
     model_path = constants.color_model_path
     images_to_predict = constants.project_folder + "/images/train"
+    images_to_predict = "C:/Users/johan/Desktop/analysis/Test4_2.mp4/detected_bees"
     output_folder = constants.predictions_folder
+    output_folder = "C:/Users/johan/Desktop/test"
     classes = ["green","white","yellow"]
     
     predict(model_path,images_to_predict,output_folder,classes)

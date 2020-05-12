@@ -188,10 +188,5 @@ def data_generator_wrapper(image_dir, batch_size, input_shape, anchors, num_clas
 
 if __name__ == '__main__':
     
-    line = ["bb","1,2,3,4,5","6,7,8,9,10"]
-    box = np.array([np.array(list(map(int,box.split(',')))) for box in line[1:]])
-    print(box)
-    
-    
     project_folder = "C:/Users/johan/Desktop/test_proj_folder"
     _main(project_folder)

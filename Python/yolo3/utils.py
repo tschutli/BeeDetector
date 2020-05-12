@@ -115,9 +115,6 @@ def get_random_data(image_path, input_shape, random=True, max_boxes=20, jitter=0
     x[x>1] = 1
     x[x<0] = 0
     image_data = hsv_to_rgb(x) # numpy array, 0 to 1
-    sav_image = Image.fromarray(np.uint8(image_data * 255))
-    import os
-    sav_image.save(os.path.join("C:/Users/johan/Desktop/test/",os.path.basename(image_path)))
 
     # correct boxes
     box_data = np.zeros((max_boxes,5))

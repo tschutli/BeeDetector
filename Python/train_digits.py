@@ -29,61 +29,130 @@ from keras.layers.normalization import BatchNormalization
 import keras
 from sklearn.utils import class_weight
 
-image_size=32
+image_size=50
+batch_size=128
+rgb=True
 
 
-def get_data_rgb(folder):
-    all_images = file_utils.get_all_image_paths_in_folder(folder)
-    num_images = len(all_images)
-    X = np.empty((num_images,image_size,image_size,3))
+def get_data(folder,rgb=True,image_size=image_size,validation_split=0.0):
+    
+    all_files=[]
+    all_labels=[]
+    for label in next(os.walk(folder))[1]:
+        sub_folder = os.path.join(folder,label)
+        for file in os.listdir(sub_folder):
+            all_files.append(os.path.join(sub_folder,file))
+            all_labels.append(label)
+    
+    shuffle_list = list(zip(all_files, all_labels))
+    random.shuffle(shuffle_list)
+    all_files, all_labels = zip(*shuffle_list)
+
+    num_images = len(all_files)
+    if rgb:
+        X = np.empty((num_images,image_size,image_size,3))
+    else:
+        X = np.empty((num_images,image_size,image_size,1))
     y = np.empty((num_images,))
-    print(len(all_images))
-    for index,image_path in enumerate(all_images):
+
+        
+    for index,image_path in enumerate(all_files):
         image = Image.open(image_path)
         image = image.resize((image_size,image_size))
-        np_image = np.asarray(image).reshape(image_size,image_size,3)
+        if rgb:
+            np_image = np.asarray(image).reshape(image_size,image_size,3)
+        else:
+            image = image.convert('L')
+            np_image = np.asarray(image).reshape(image_size,image_size,1)
         X[index] = np_image
-        annotations = file_utils.get_annotations(image_path)
-        y[index] = int(annotations[0]["name"])-1
+        y[index] = int(all_labels[index])
+    
+    X_val = X[:int(num_images*validation_split)]
+    y_val = y[:int(num_images*validation_split)]
+    X=X[int(num_images*validation_split):]
+    y=y[int(num_images*validation_split):]
     class_weights = class_weight.compute_class_weight('balanced',np.unique(y),y)
-    y = to_categorical(y, num_classes = 8)
+    y = to_categorical(y)
+    y_val = to_categorical(y_val)
+    
+    return X,y,X_val,y_val,class_weights
 
-    return X,y,class_weights
 
 
-def get_data(folder):
-    all_images = file_utils.get_all_image_paths_in_folder(folder)
-    num_images = len(all_images)
-    X = np.empty((num_images,image_size,image_size,1))
-    y = np.empty((num_images,))
-    print(len(all_images))
-    for index,image_path in enumerate(all_images):
-        image = Image.open(image_path)
-        image = image.resize((image_size,image_size))
-        image = image.convert('L')
-        np_image = np.asarray(image).reshape(image_size,image_size,1)
-        X[index] = np_image
-        annotations = file_utils.get_annotations(image_path)
-        y[index] = int(annotations[0]["name"])-1
-    class_weights = class_weight.compute_class_weight('balanced',np.unique(y),y)
-    y = to_categorical(y, num_classes = 8)
-    return X,y,class_weights
-
-def get_predict_data(folder,portion=1.0):
+def get_predict_data(folder,portion=1.0,rgb=True):
     all_images = file_utils.get_all_image_paths_in_folder(folder)
     num_images = int(np.ceil(len(all_images)*portion))
-    X = np.empty((num_images,image_size,image_size,1))
+    if rgb:
+        X = np.empty((num_images,image_size,image_size,3))
+    else:
+        X = np.empty((num_images,image_size,image_size,1))
     print(num_images)
     random.shuffle(all_images)
     for index,image_path in enumerate(all_images):
         image = Image.open(image_path)
         image = image.resize((image_size,image_size))
-        image = image.convert('L')
-        np_image = np.asarray(image).reshape(image_size,image_size,1)
+        if rgb:
+            np_image = np.asarray(image).reshape(image_size,image_size,3)
+        else:
+            image = image.convert('L')
+            np_image = np.asarray(image).reshape(image_size,image_size,1)
         X[index] = np_image
         if index==num_images-1:
             break
     return X
+
+
+def svhn_layer(model, filters, strides, name,input_shape=None):
+
+    if input_shape:
+        model.add(Conv2D(filters, (5, 5), 
+               padding='same', name='conv2d_' + name,input_shape=input_shape))
+    else:
+        model.add(Conv2D(filters, (5, 5), 
+           padding='same', name='conv2d_' + name))
+
+
+    model.add(BatchNormalization())
+    model.add(Activation('relu'))
+
+    model.add(MaxPooling2D(pool_size=(2, 2), strides=(strides, strides),
+              name='maxpool_2d_' + name))
+
+    model.add(Dropout(0.2))
+
+    return model
+
+
+def get_model_svhn_2(input_shape,num_classes):
+    
+    keras.backend.clear_session()
+
+    model = Sequential()
+    
+    svhn_layer(model, 48, 2, 'hidden1',input_shape=input_shape)
+    svhn_layer(model, 48, 1, 'hidden2')
+    svhn_layer(model, 48, 1, 'hidden3')
+    
+    svhn_layer(model, 64, 2, 'hidden4')
+    svhn_layer(model, 64, 1, 'hidden5')
+    svhn_layer(model, 64, 1, 'hidden6')
+    
+    svhn_layer(model, 128, 2, 'hidden7')
+    svhn_layer(model, 128, 1, 'hidden8')
+    svhn_layer(model, 128, 1, 'hidden9')
+    
+    svhn_layer(model, 192, 2, 'hidden10')
+    svhn_layer(model, 192, 1, 'hidden11')
+    
+    model.add(Flatten())
+    
+    model.add(Dense(3072))
+    model.add(Dense(3072))
+    model.add(Dense(num_classes,  activation='softmax'))
+        
+    model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['acc'])
+
+    return model
 
 
 def get_model_svhn(input_shape,num_classes,learning_rate=0.001):
@@ -94,7 +163,7 @@ def get_model_svhn(input_shape,num_classes,learning_rate=0.001):
     model = keras.Sequential([
         keras.layers.Conv2D(32, (3, 3), padding='same', 
                                activation='relu',
-                               input_shape=(32, 32, 3)),
+                               input_shape=input_shape),
         keras.layers.BatchNormalization(),
         keras.layers.Conv2D(32, (3, 3), padding='same', 
                             activation='relu'),
@@ -171,30 +240,22 @@ def get_old_model(input_shape,num_classes):
 
 
 
-def train(project_dir):
+def train(data_dir,trained_model):
     
     print("Loading data...")
-    training_data_dir=os.path.join(project_dir,"images/train")
-    X_train,y_train,class_weights = get_data_rgb(training_data_dir)
-    validation_data_dir=os.path.join(project_dir,"images/validation")
-    X_val,y_val,_ = get_data_rgb(validation_data_dir)
-    test_data_dir=os.path.join(project_dir,"images/test")
-    X_test,y_test,_ = get_data_rgb(test_data_dir)
+    X,y,X_val,y_val,class_weights = get_data(data_dir,validation_split=0.1)
 
 
-    model = get_model_svhn((image_size,image_size,3),8)
+    model = get_model_svhn((image_size,image_size,3),9)
     
+    model.summary()
+    
+    mc = ModelCheckpoint(mode='max', filepath=trained_model, monitor='val_acc', save_best_only='True', save_weights_only='True', verbose=1)
+
+    model.load_weights(trained_model)
         
-    
-    model_save_path=os.path.join(project_dir,"trained_model.h5")
-    mc = ModelCheckpoint(mode='max', filepath=model_save_path, monitor='val_acc', save_best_only='True', save_weights_only='True', verbose=1)
-
-    #model.load_weights(model_save_path)
-    
-    batch_size=512
-    
     datagen = ImageDataGenerator(rescale=1./255,height_shift_range=5,width_shift_range=5,rotation_range=360,brightness_range=[0.6,1.4],zoom_range=0.1)
-    it = datagen.flow(X_train, y_train,batch_size=batch_size)
+    it = datagen.flow(X, y,batch_size=batch_size)
     
     '''
     it = datagen.flow(X_train, y_train,batch_size=1)
@@ -214,16 +275,12 @@ def train(project_dir):
     '''
     
     history = model.fit_generator(it,
-                                  steps_per_epoch=np.ceil(y_train.shape[0]*3/batch_size),
+                                  steps_per_epoch=np.ceil(y.shape[0]*2/batch_size),
                                   epochs = 1000, 
-                                  validation_data = (X_val, y_val),
+                                  validation_data = (X_val/255., y_val),
                                   callbacks=[mc],
                                   class_weight=class_weights)
-    
-    #history = model.fit(X_train, y_train, epochs = 400, batch_size = 2048, validation_data = (X_val, y_val),callbacks=[mc])
-    
-    score = model.evaluate(X_test, y_test, verbose=0)
-    print(score)
+        
     
 
 def predict_with_visualization(project_dir,input_folder):
@@ -231,9 +288,10 @@ def predict_with_visualization(project_dir,input_folder):
     
     
     model_save_path=os.path.join(project_dir,"trained_model.h5")
-    model = get_old_model((image_size,image_size,1),8)
+    model = get_model_svhn((image_size,image_size,3),9)
     model.load_weights(model_save_path)
     
+    '''
     print("Evaluating Test Data")
     test_data_dir=os.path.join(project_dir,"images/test")
     X_test,y_test = get_data(test_data_dir)
@@ -253,21 +311,26 @@ def predict_with_visualization(project_dir,input_folder):
     df = df.round(1)
     print(df)
 
-
+    '''
+    
     X_test = get_predict_data(input_folder,portion=0.01)
-    results = model.predict(X_test)
+    results = model.predict(X_test/255.)
     scores = np.max(results,axis=1)
-    labels = np.argmax(results, axis = 1) + 1 
+    labels = np.argmax(results, axis = 1)
 
     np.set_printoptions(formatter={'float': lambda x: "{0:0.2f}".format(x)})
     for i in range(50):
     	# define subplot
         #pyplot.subplot(20,1,i+1)
     	# generate batch of images
-        image = X_test[i][:,:,0].astype('uint8')
-    
-        pyplot.imshow(image,cmap='gray',vmin=0,vmax=255)
-    # show the figure
+        if not rgb:
+            image = X_test[i][:,:,0].astype('uint8')
+            pyplot.imshow(image,cmap='gray',vmin=0,vmax=255)
+        else:
+            image = X_test[i].astype('uint8')
+            pyplot.imshow(image)
+
+
         pyplot.show()
         print(labels[i])
         print(scores[i])
@@ -276,5 +339,5 @@ def predict_with_visualization(project_dir,input_folder):
     
 
 if __name__== "__main__":
-    #predict_with_visualization(constants.project_folder,"C:/Users/johan/Desktop/analysis/Test4_0.mp4/detected_numbers")
-    train(constants.project_folder)
+    predict_with_visualization(constants.project_folder,"C:/Users/johan/Desktop/analysis/Test4_4.mp4/detected_numbers")
+    #train("C:/Users/johan/Desktop/Data/Digit_classification_extended",os.path.join(constants.project_folder,"trained_model.h5"))

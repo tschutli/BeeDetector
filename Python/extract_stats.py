@@ -7,6 +7,7 @@ Created on Fri May  8 14:20:00 2020
 
 import os
 import pickle
+from datetime import datetime, timedelta
 
 
 min_consecutive_frames_to_be_counted = 3
@@ -36,8 +37,58 @@ def extract_stats(working_dirs):
         with open(os.path.join(working_dir,"combined_detections.pkl"), 'wb') as f:
             pickle.dump(detection_map,f)
 
+        write_starts_and_ends_to_file(detection_map,working_dir)
         
         
+
+def write_starts_and_ends_to_file(detection_map,working_dir):
+    
+    def is_id_in_frame(bee_id, frame_number):
+        if frame_number in detection_map and detection_map[frame_number] != "Skipped":
+            for detection in detection_map[frame_number]:
+                if detection["id"] == bee_id:
+                    return True
+        return False
+
+    
+    csv_file = os.path.join(working_dir,"all_events.csv")
+    if os.path.exists(csv_file):
+        os.remove(csv_file)
+    
+    
+    with open(csv_file, 'a') as f:
+        f.write("TIME,BEE,ACTION,HOLE\n")
+        fps = 25
+        
+        frame_number = 0
+        while frame_number in detection_map:
+            if detection_map[frame_number] and detection_map[frame_number] != "Skipped":
+                for detection in detection_map[frame_number]:
+                    bee_id = detection["id"]
+                    if bee_id == -1:
+                        continue
+                    action = None
+                    hole = None
+                    if not is_id_in_frame(bee_id,frame_number-1) and detection["start"] != None and detection["start"] != "too large":
+                        action = "Leave"
+                        hole = detection["start"]
+                    elif not is_id_in_frame(bee_id,frame_number+1) and detection["end"] != None and detection["end"] != "too large":
+                        action = "Enter"
+                        hole = detection["end"]
+                    
+                    if action != None:
+                        seconds = frame_number*(1/fps)
+                        time = timedelta(seconds=seconds)
+                        name = "?"
+                        if "final_color" in detection and "final_number" in detection:
+                            name = detection["final_color"] + str(detection["final_number"])
+                        f.write(str(time) + "," + name + "," + action + "," + hole+"\n")
+            frame_number+=1
+                        
+                        
+                        
+
+
         
 def filter_numbers_and_colors(detection_map):
     
@@ -49,17 +100,37 @@ def filter_numbers_and_colors(detection_map):
             for detection in detection_map[frame_number]:
                 if "color" in detection and detection["color"] != None:
                     bee_id = detection["id"]
-                    if not bee_id in id2color:
-                        id2color[bee_id] = []
-                        id2number[bee_id] = []
-                    id2color[bee_id].append((detection["color"],detection["color_score"]))
-                    id2number[bee_id].append((detection["number"],detection["number_score"]))
+                    if bee_id == -1:
+                        continue
+                    if detection["color_score"] > 0.9:
+                        if not bee_id in id2color:
+                            id2color[bee_id] = []
+                            id2number[bee_id] = []
+                        id2color[bee_id].append((detection["color"],detection["color_score"]))
+                        id2number[bee_id].append((detection["number"],detection["number_score"]))
+                        
         frame_number += 1
     
     def find_best_prediction(tuple_list):
+        
+        total_scores = {}
+        for (label,score) in tuple_list:
+            if score < 0.9 or label == 0 or label == "0":
+                continue
+            if not label in total_scores:
+                total_scores[label] = score
+            else:
+                total_scores[label] += score
+        if not total_scores:
+            return None
+        return max(total_scores, key=total_scores.get)
+            
+        '''
         sorted_by_score = sorted(tuple_list, key=lambda tup: tup[1],reverse=True)
         return sorted_by_score[0]
-                
+        '''        
+        
+        
     for bee_id in id2color.keys():
         id2color[bee_id] = find_best_prediction(id2color[bee_id])
     
@@ -72,9 +143,10 @@ def filter_numbers_and_colors(detection_map):
         if detection_map[frame_number] and detection_map[frame_number] != "Skipped":
             for detection in detection_map[frame_number]:
                 bee_id = detection["id"]
-                if bee_id in id2color:
-                    detection["final_color"] = id2color[bee_id][0]
-                    detection["final_number"] = id2number[bee_id][0]
+                if bee_id in id2color and id2color[bee_id] != None:
+                    detection["final_color"] = id2color[bee_id]
+                if bee_id in id2number and id2number[bee_id] != None:
+                    detection["final_number"] = id2number[bee_id]
                              
         frame_number += 1
       
@@ -189,6 +261,14 @@ def apply_holes_to_bee_detections(detection_map,working_dir,image_size=(3840,216
                     continue
                 detection["start"] = starts[bee_id]
                 detection["end"] = ends[bee_id]                    
+                '''
+                if starts[bee_id] == ends[bee_id]:
+                    detection["id"] = -1
+                else:
+                    detection["start"] = starts[bee_id]
+                    detection["end"] = ends[bee_id]   
+                '''
+                
         frame_number += 1
         
     print("Detected " + str(len(starts.keys())) + " flights: " + os.path.basename(working_dir))
@@ -289,9 +369,6 @@ def enumerate_bee_detections(detection_map,working_dir,image_size=(3840,2160)):
                             curr_detection["id"] = current_bee_index
                             prev_detection["id"] = current_bee_index
                             current_bee_index += 1
-                        if distance > 0.0015:
-                            print(distance)
-                            print(curr_detection["id"])
                     already_assigned_prev_idxs.append(prev_index)
                     
             
