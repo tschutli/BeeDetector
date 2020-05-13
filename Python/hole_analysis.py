@@ -33,10 +33,10 @@ def hole_frame_reader(working_dir,frame_queue,image_size,progress_callback=None,
     
     hole_images_folder = os.path.join(working_dir,"frames_without_bees")
     all_images = file_utils.get_all_image_paths_in_folder(hole_images_folder)
-
     
+    detected_holes_xml_path = os.path.join(hole_images_folder,"detected_holes.xml")
     #Only detect holes if detected_holes.pkl does not yet exist
-    if not os.path.isfile(os.path.join(working_dir,"detected_holes.pkl")):
+    if not os.path.isfile(detected_holes_xml_path):
 
         progress_callback("Starting to detect holes", working_dir)
     
@@ -44,6 +44,7 @@ def hole_frame_reader(working_dir,frame_queue,image_size,progress_callback=None,
         
         all_detections = []
         num_holes_detected = []
+        image_paths = []
         for index,image_path in enumerate(all_images):
             
             progress_callback(index/len(all_images),working_dir)
@@ -51,6 +52,8 @@ def hole_frame_reader(working_dir,frame_queue,image_size,progress_callback=None,
             if pause_event != None and pause_event.is_set():
                 return
     
+            if os.path.basename(image_path) == "first_frame.jpg" and len(all_images)>1:
+                continue
             
             image = Image.open(image_path)
             resized_image = image.resize(image_size)
@@ -76,23 +79,27 @@ def hole_frame_reader(working_dir,frame_queue,image_size,progress_callback=None,
             detections = eval_utils.non_max_suppression(detections,0.5)
             all_detections.append(detections)
             num_holes_detected.append(len(detections))
+            image_paths.append(image_path)
         most_frequent_answer = max(set(num_holes_detected), key = num_holes_detected.count)
         index_of_most_frequent_answer = num_holes_detected.index(most_frequent_answer)
             
         holes = all_detections[index_of_most_frequent_answer]
     
-            
         print("Detected " + str(len(holes)) + " holes: " + os.path.basename(working_dir),flush=True)
         
-        enumerate_holes(holes)
             
-        src_image = all_images[index_of_most_frequent_answer]
-        save_holes_predictions_image(holes,src_image,os.path.join(hole_images_folder,"detected_holes.jpg"))
-        file_utils.save_annotations_to_xml(holes, all_images[index_of_most_frequent_answer],  all_images[index_of_most_frequent_answer][:-4] + ".xml")
-    
-        
-        with open(os.path.join(working_dir,"detected_holes.pkl"), 'wb') as f:
-            pickle.dump(holes,f)
+        src_image = image_paths[index_of_most_frequent_answer]
+        detected_holes_image_path=detected_holes_xml_path[:-4] + ".jpg"
+        save_holes_predictions_image(holes,src_image,detected_holes_image_path)
+        file_utils.save_annotations_to_xml(holes, detected_holes_image_path,  detected_holes_xml_path)
+
+
+    holes = file_utils.get_annotations_from_xml(detected_holes_xml_path)
+    to_relative_coordinates(holes,detected_holes_xml_path[:-4]+".jpg")
+    enumerate_holes(holes)
+
+    with open(os.path.join(working_dir,"detected_holes.pkl"), 'wb') as f:
+        pickle.dump(holes,f)
         
         
     progress_callback(1.0,working_dir)
@@ -101,7 +108,19 @@ def hole_frame_reader(working_dir,frame_queue,image_size,progress_callback=None,
 
 
 
+def to_relative_coordinates(holes,image_path):
+    image = Image.open(image_path)
+    width, height = image.size
+    for hole in holes:
+        [top,left,bottom,right] = hole["bounding_box"]
+        top = top/height
+        bottom = bottom/height
+        left = left/width
+        right = right/width
+        hole["bounding_box"] = [top,left,bottom,right]
     
+
+        
     
 def save_holes_predictions_image(holes,image_path,destination_path):
     

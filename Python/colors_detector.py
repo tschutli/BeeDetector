@@ -126,7 +126,7 @@ def detect_colors(working_dir,frame_queue,labels,progress_callback=None, pause_e
             pickle.dump(detected_colors,f)
     
     progress_callback(1.0,working_dir)
-    progress_callback("Done detecting colors: " + working_dir,working_dir)
+    progress_callback("Finished detecting colors",working_dir)
 
         
 

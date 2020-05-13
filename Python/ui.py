@@ -47,35 +47,8 @@ pre_tool = None
 post_tool = None
 
 window_width = 650
-window_height = 750
+window_height = 800
 
-
-'''
-def run_postprocessing():
-    progress_bar_2['value'] = 0.01
-    global post_tool
-    post_tool = postprocessing.PostprocessTool()
-    error = post_tool.make_shape_files(input_folder_input_2.get(),output_path_input_2.get())
-    if not error == "":
-        messagebox.showinfo('Error', error)
-    else:
-        progress_bar_2['value'] = 100
-        messagebox.showinfo('Success', "Done")
-        progress_bar_2['value'] = 0
-    
-        
-    
-def process_callback(progress):
-    if progress == 999:
-        run_button.configure(text="Run")
-        progress_bar['value'] = 0.0
-    else:
-        progress_bar['value'] = progress*100
-        if(progress == 1.0):
-            messagebox.showinfo('Success', "Done")
-            run_button.configure(text="Run")
-
-'''  
 
 
 def resource_path(relative_path):
@@ -117,7 +90,7 @@ def start_analyze_videos(videos, results_folder, visualize,pause_event, progress
         
     #analyze_video.analyze_videos(constants.bee_model_path, constants.hole_model_path, videos, results_folder, visualize, progress_callback, pause_event)
     global analyze_videos_thread
-    my_args=(constants.bee_model_path, constants.hole_model_path,constants.number_model_path, videos, results_folder, visualize, progress_callback, pause_event,)
+    my_args=(constants.bee_model_path, constants.hole_model_path, constants.color_model_path, constants.number_model_path, videos, results_folder, visualize, progress_callback, pause_event,)
     analyze_videos_thread = threading.Thread(target=analyze_video.analyze_videos, args=my_args)
     analyze_videos_thread.daemon = True
     analyze_videos_thread.start()
@@ -180,17 +153,23 @@ def start_ui():
     detect_holes_progress_label = Label(tab1,justify=LEFT, text="Detecting holes: ")
     detect_holes_progress_label.grid(column=0, row=31, pady=5, padx = 5, columnspan=1, sticky=W)
 
+    detect_colors_progress_bar = Progressbar(tab1, length=10000)
+    detect_colors_progress_bar.grid(column=1, row=32, pady=5, padx = 5, sticky=W, columnspan=3)
+    detect_colors_progress_bar['value'] = 0
+    detect_colors_progress_bar_label = Label(tab1,justify=LEFT, text="Detecting colors: ")
+    detect_colors_progress_bar_label.grid(column=0, row=32, pady=5, padx = 5, columnspan=1, sticky=W)
+
     detect_numbers_progress_bar = Progressbar(tab1, length=10000)
-    detect_numbers_progress_bar.grid(column=1, row=32, pady=5, padx = 5, sticky=W, columnspan=3)
+    detect_numbers_progress_bar.grid(column=1, row=33, pady=5, padx = 5, sticky=W, columnspan=3)
     detect_numbers_progress_bar['value'] = 0
     detect_numbers_progress_label = Label(tab1,justify=LEFT, text="Detecting numbers: ")
-    detect_numbers_progress_label.grid(column=0, row=32, pady=5, padx = 5, columnspan=1, sticky=W)
+    detect_numbers_progress_label.grid(column=0, row=33, pady=5, padx = 5, columnspan=1, sticky=W)
 
     visualize_progress_bar = Progressbar(tab1, length=10000)
-    visualize_progress_bar.grid(column=1, row=33, pady=5, padx = 5, sticky=W, columnspan=3)
+    visualize_progress_bar.grid(column=1, row=34, pady=5, padx = 5, sticky=W, columnspan=3)
     visualize_progress_bar['value'] = 0
     visualize_progress_label = Label(tab1,justify=LEFT, text="Visualizing results: ")
-    visualize_progress_label.grid(column=0, row=33, pady=5, padx = 5, columnspan=1, sticky=W)
+    visualize_progress_label.grid(column=0, row=34, pady=5, padx = 5, columnspan=1, sticky=W)
 
     
     #Text Output:
@@ -255,13 +234,18 @@ def start_ui():
     def progress_callback(progress):
         if progress == "started_script":
             run_button.configure(text="Pause",state="normal", command=lambda: threading.Thread(target=pause_analyze_videos, args=(pause_event,progress_callback,)).start())
+            detect_bees_progress_bar['value'] = 0
+            visualize_progress_bar['value'] = 0
+            detect_holes_progress_bar['value'] = 0
+            detect_numbers_progress_bar['value'] = 0
+            detect_colors_progress_bar['value'] = 0
         elif progress == "started_stopping_script":
             run_button.configure(text="Please wait...", state="disabled")
         elif progress == "stopped_script":
             run_button.configure(text="Start", state="normal", command=lambda: start_analyze_videos(convert_paths_list(video_paths_input.get()),output_path_input.get(),visualize_variable.get(),pause_event,progress_callback))
-        elif progress == "Success. All videos are analyzed.":
+        elif progress == "Success. All videos are analyzed!":
             run_button.configure(text="Start", state="normal", command=lambda: start_analyze_videos(convert_paths_list(video_paths_input.get()),output_path_input.get(),visualize_variable.get(),pause_event,progress_callback))
-            progress_callback("Success. All videos are analyzed!")
+            progress_callback("Success. All videos are analyzed.")
         elif type(progress) == tuple:
             if type(progress[1]) == float:
                 #it is a numerical progress
@@ -271,6 +255,8 @@ def start_ui():
                     visualize_progress_bar['value'] = progress[1]*100
                 elif progress[0] == "detect_holes":
                     detect_holes_progress_bar['value'] = progress[1]*100
+                elif progress[0] == "detect_colors":
+                    detect_colors_progress_bar['value'] = progress[1]*100
                 elif progress[0] == "detect_numbers":
                     detect_numbers_progress_bar['value'] = progress[1]*100
         elif type(progress) == str:
@@ -312,7 +298,7 @@ def start_ui():
     output_path_input.delete(0,END)
     output_path_input.insert(0,constants.working_dir)
     video_paths_input.delete(0,END)
-    video_paths_input.insert(0,"C:/Users/johan/Desktop/Test5.MP4; ")
+    video_paths_input.insert(0,"D:/inputs/Test4_4.MP4; ")
 
 
     

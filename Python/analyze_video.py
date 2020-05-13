@@ -96,8 +96,8 @@ def analyze_videos(trained_bee_model, trained_hole_model, trained_colors_model, 
     if visualize:
         visualize_videos(input_videos,working_dirs,progress_callback, pause_event)
     
-    if pause_event != None and pause_event.is_set():
-        progress_callback("Success. All videos are analyzed.")
+    if pause_event != None and not pause_event.is_set():
+        progress_callback("Success. All videos are analyzed!")
 
 
 def detect_numbers(trained_numbers_model,working_dirs,progress_callback=None,pause_event=None):
@@ -223,7 +223,7 @@ def visualize_videos(input_videos,working_dirs,progress_callback=None, pause_eve
     
 
 
-def visualize(input_video,detection_map,output_path,progress_callback=None, pause_event=None,image_size=(1024,578)):
+def visualize(input_video,detection_map,output_path,progress_callback=None, pause_event=None,image_size=(2048,1156)):
     #start = current_milli_time()
     #cap = cv2.VideoCapture(input_video)
     #cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
@@ -243,7 +243,7 @@ def visualize(input_video,detection_map,output_path,progress_callback=None, paus
     frame_number = 0
     for frame_number in progressbar.progressbar(range(0,no_of_frames)):
         
-        if frame_number > 200000: 
+        if frame_number > 10000: 
             break
     
         if frame_number % 100 == 0:
@@ -289,10 +289,10 @@ def visualize(input_video,detection_map,output_path,progress_callback=None, paus
                 
                 if detection["id"] != -1:
                     starting_point = detection["start"]
-                    if starting_point == None:
+                    if starting_point == None or starting_point == "too large":
                         starting_point = "?"
                     end_point = detection["end"]
-                    if end_point == None:
+                    if end_point == None or end_point == "too large":
                         end_point = "?"
                     
                     if starting_point != "?" or end_point != "?":
@@ -307,14 +307,14 @@ def visualize(input_video,detection_map,output_path,progress_callback=None, paus
                         '''
                         if "final_color" in detection and "final_number" in detection:
                             bee_description = str(detection["final_color"]) + str(detection["final_number"]) + ": " + bee_description
-                         cv2.putText(image, bee_description, (left, top-10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, rectangle_color, 2)
+                        cv2.putText(image, bee_description, (left, top-10), cv2.FONT_HERSHEY_SIMPLEX, 1, rectangle_color, 2)
                         
                         
                         
 
         #print("3: " + str(current_milli_time()-start), flush=True)
-        #if detection_map[frame_number] != "Skipped":
-        out.write(image)
+        if detection_map[frame_number] != "Skipped":
+            out.write(image)
             #print("4: " + str(current_milli_time()-start), flush=True)
             #print("", flush=True)
 

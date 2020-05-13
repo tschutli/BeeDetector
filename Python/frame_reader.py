@@ -87,6 +87,11 @@ def start(video_path, queue, working_dir, image_size=(640,480),progress_callback
                 print("BREAK")
                 break
             
+            if frame_number == 0:
+                save_path = os.path.join(frames_without_bees_path,"first_frame.jpg")
+                cv2.imwrite(save_path,original_image)
+
+            
             last_24_frames[frame_number%24] = original_image
     
             if frame_number in detection_map:

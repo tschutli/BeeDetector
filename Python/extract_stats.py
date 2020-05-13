@@ -7,10 +7,18 @@ Created on Fri May  8 14:20:00 2020
 
 import os
 import pickle
-from datetime import datetime, timedelta
+from datetime import timedelta
 
 
 min_consecutive_frames_to_be_counted = 3
+
+#A start of a flight is only counted if the area of the bee detection bounding 
+#box is smaller than hole_area_factor*average_hole_area
+hole_area_factor = 1.2
+
+#A bee will only be tracked over time if it is not further apart than 
+#(MAX_TRACKING_DISTANCE_FACTOR*average_hole_height) in two consecutive frames
+MAX_TRACKING_DISTANCE_FACTOR = 1.4
 
 image_size=(3840,2160)
 
@@ -204,6 +212,10 @@ def apply_holes_to_bee_detections(detection_map,working_dir,image_size=(3840,216
     with open(detected_holes_path, 'rb') as f:
         holes = pickle.load(f)
 
+    print(holes)
+    with open(os.path.join(working_dir,"detected_holes - Kopie.pkl"), 'rb') as f:
+        holes = pickle.load(f)
+    print(holes)
 
     
     def is_id_in_frame(bee_id, frame_number):
@@ -235,22 +247,19 @@ def apply_holes_to_bee_detections(detection_map,working_dir,image_size=(3840,216
                     if detection["name"] == "bee":
                         #Bee is sitting
                         starts[bee_id] = get_hole_id_at_position(center_x,center_y,holes)
-                        if starts[bee_id] != None and get_area_of_detection(detection) >= average_hole_area:
+                        if starts[bee_id] != None and get_area_of_detection(detection) >= average_hole_area*hole_area_factor:
                             starts[bee_id] = "too large"
-                            #print("Detected an erroneous start point: Bee detection is too large.")
                     else:
                         starts[bee_id] = None
                 if not is_id_in_frame(bee_id,frame_number+1):
                     if detection["name"] == "bee":
                         #Bee is sitting
                         ends[bee_id] = get_hole_id_at_position(center_x,center_y,holes)
-                        if ends[bee_id] != None and get_area_of_detection(detection) >= average_hole_area:
+                        if ends[bee_id] != None and get_area_of_detection(detection) >= average_hole_area*hole_area_factor:
                             ends[bee_id] = "too large"
-                            #print("Detected an erroneous end point: Bee detection is too large.")
                     else:
                         ends[bee_id] = None    
         frame_number += 1
-    
     frame_number = 0
     while frame_number in detection_map:
         
@@ -260,7 +269,7 @@ def apply_holes_to_bee_detections(detection_map,working_dir,image_size=(3840,216
                 if bee_id == -1:
                     continue
                 detection["start"] = starts[bee_id]
-                detection["end"] = ends[bee_id]                    
+                detection["end"] = ends[bee_id]    
                 '''
                 if starts[bee_id] == ends[bee_id]:
                     detection["id"] = -1
@@ -269,10 +278,10 @@ def apply_holes_to_bee_detections(detection_map,working_dir,image_size=(3840,216
                     detection["end"] = ends[bee_id]   
                 '''
                 
+                
         frame_number += 1
         
     print("Detected " + str(len(starts.keys())) + " flights: " + os.path.basename(working_dir))
-    
     
 
 
@@ -323,8 +332,7 @@ def enumerate_bee_detections(detection_map,working_dir,image_size=(3840,2160)):
     with open(detected_holes_path, 'rb') as f:
         holes = pickle.load(f)
     
-    MAX_SQUARED_DISTANCE = pow(get_average_hole_height(holes,image_size)*1.4,2)
-    print(MAX_SQUARED_DISTANCE)
+    MAX_SQUARED_DISTANCE = pow(get_average_hole_height(holes,image_size)*MAX_TRACKING_DISTANCE_FACTOR,2)
     
         
     current_bee_index = 0
@@ -353,15 +361,49 @@ def enumerate_bee_detections(detection_map,working_dir,image_size=(3840,2160)):
                     squared_distance = pow(x-prev_x,2) + pow((y-prev_y)/width_height_ratio,2)
                     distances.append((squared_distance,prev_index,curr_index))
             
+            distances_current_frame = []
+            for index1,detection1 in enumerate(curr_detections):
+                for index2,detection2 in enumerate(curr_detections):
+                    if index1 == index2:
+                        continue
+                    [top,left,bottom,right] = detection1["bounding_box"]
+                    (x1, y1) = ((right+left)/2,(bottom+top)/2)
+                    [top,left,bottom,right] = detection2["bounding_box"]
+                    (x2, y2) = ((right+left)/2,(bottom+top)/2)
+                    squared_distance = pow(x1-x2,2) + pow((y1-y2)/width_height_ratio,2)
+                    distances_current_frame.append((squared_distance,index1,index2))
+            
+            distances_current_frame = sorted(distances_current_frame, key = lambda tup: tup[0])
             distances = sorted(distances, key = lambda tup: tup[0])
+            
+            
+            
+            def is_another_detection_close(index,max_distance):
+                for (d,index1,index2) in distances_current_frame:
+                    if index1 == index and d<=max_distance:
+                        return True
+                return False
+            
+            
             
             already_assigned_prev_idxs = []
             for distance,prev_index,curr_index in distances:
                 curr_detection = curr_detections[curr_index]
                 prev_detection = prev_detections[prev_index]
                 if distance < MAX_SQUARED_DISTANCE and not prev_index in already_assigned_prev_idxs and not "id" in curr_detection:
+                    #The two bees are close and both have not been assigned yet
+                    
                     if curr_detection["name"] == "bee flying" and prev_detection["name"] == "bee flying":
-                        curr_detection["id"] = -1
+                        
+                        if is_another_detection_close(curr_index,MAX_SQUARED_DISTANCE*4):
+                            curr_detection["id"] = -1
+                        elif prev_detection["id"] != -1:
+                            curr_detection["id"] = prev_detection["id"]
+                        else:
+                            curr_detection["id"] = current_bee_index
+                            current_bee_index += 1
+                            
+                    
                     else:
                         if prev_detection["id"] != -1:
                             curr_detection["id"] = prev_detection["id"]
@@ -372,10 +414,14 @@ def enumerate_bee_detections(detection_map,working_dir,image_size=(3840,2160)):
                     already_assigned_prev_idxs.append(prev_index)
                     
             
-            for curr_detection in curr_detections:
+            
+            for curr_index,curr_detection in enumerate(curr_detections):
                 if not "id" in curr_detection:
-                    curr_detection["id"] = current_bee_index
-                    current_bee_index += 1
+                    if is_another_detection_close(curr_index,MAX_SQUARED_DISTANCE*4):
+                        curr_detection["id"] = -1
+                    else:
+                        curr_detection["id"] = current_bee_index
+                        current_bee_index += 1
 
                             
             #Updating bee_id_count with detections in current frame

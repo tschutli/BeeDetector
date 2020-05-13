@@ -30,6 +30,8 @@ def start(trained_model,working_dirs,stop_event,progress_callback):
             return
         
         if os.path.isfile(os.path.join(working_dir,"detected_numbers.pkl")):
+            progress_callback(1.0,working_dir)
+            progress_callback("Finished detecting numbers: ", working_dir)
             continue
 
         progress_callback("Starting to detect numbers: ", working_dir)
@@ -57,8 +59,9 @@ def start(trained_model,working_dirs,stop_event,progress_callback):
         
         with open(os.path.join(working_dir,"detected_numbers.pkl"), 'wb') as f:
             pickle.dump(detection_map,f)
+            
         progress_callback(1.0,working_dir)
-        progress_callback("Done detecting numbers: ", working_dir)
+        progress_callback("Finished detecting numbers: ", working_dir)
 
 
 
