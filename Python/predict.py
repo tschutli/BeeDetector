@@ -112,8 +112,8 @@ def predict(project_dir,images_to_predict,output_folder,tile_size,min_confidence
         
         print(str(len(detections)) + " objects detected")
         
-        predictions_out_path = os.path.join(output_folder, os.path.basename(image_path)[:-4] + "_predictions.json")
-        file_utils.save_json_file(detections,predictions_out_path)
+        predictions_out_path = os.path.join(output_folder, os.path.basename(image_path)[:-4] + ".xml")
+        file_utils.save_annotations_to_xml(detections, image_path, predictions_out_path)
 
         #copy the ground truth annotations to the output folder if there is any ground truth
         ground_truth = get_ground_truth_annotations(image_path)
@@ -125,8 +125,8 @@ def predict(project_dir,images_to_predict,output_folder,tile_size,min_confidence
                     col = "black"
                     visualization_utils.draw_bounding_box_on_image(image,top,left,bottom,right,display_str_list=(),thickness=1, color=col, use_normalized_coordinates=False)          
 
-            ground_truth_out_path = os.path.join(output_folder, os.path.basename(image_path)[:-4] + "_ground_truth.json")
-            file_utils.save_json_file(ground_truth,ground_truth_out_path)
+            ground_truth_out_path = os.path.join(output_folder, os.path.basename(image_path)[:-4] + "_ground_truth.xml")
+            file_utils.save_annotations_to_xml(ground_truth, image_path, ground_truth_out_path)
         
 
         for detection in detections:

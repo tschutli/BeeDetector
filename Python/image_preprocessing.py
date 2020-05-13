@@ -504,9 +504,9 @@ def set_config_file_parameters(project_dir,num_classes,tensorflow_tile_size=(640
         pipeline_config.model.faster_rcnn.image_resizer.fixed_shape_resizer.height = tensorflow_tile_size[1]                                                                                                                                                                                       
     
     
-    pipeline_config.model.faster_rcnn.first_stage_max_proposals = 200
-    pipeline_config.model.faster_rcnn.second_stage_post_processing.batch_non_max_suppression.max_detections_per_class = 200                                                                                                                                                                                 
-    pipeline_config.model.faster_rcnn.second_stage_post_processing.batch_non_max_suppression.max_total_detections = 200                                                                                                                                                                                 
+    pipeline_config.model.faster_rcnn.first_stage_max_proposals = 100
+    pipeline_config.model.faster_rcnn.second_stage_post_processing.batch_non_max_suppression.max_detections_per_class = 30                                                                                                                                                                                 
+    pipeline_config.model.faster_rcnn.second_stage_post_processing.batch_non_max_suppression.max_total_detections = 30                                                                                                                                                                                 
 
     '''
     pipeline_config.model.faster_rcnn.feature_extractor.first_stage_features_stride = 8                                                                                                                                                                                 
