@@ -29,7 +29,7 @@ current_milli_time = lambda: int(round(time.time() * 1000))
 
 image_size = constants.tensorflow_tile_size
 min_confidence_score = 0.5
-num_threads = 7
+num_threads = 6
 
 
 
@@ -89,6 +89,9 @@ def analyze_videos(trained_bee_model, trained_hole_model, trained_colors_model, 
     
     detect_numbers(trained_numbers_model,working_dirs,progress_callback,pause_event)
     
+    if pause_event != None and pause_event.is_set():
+        return
+
     extract_stats.extract_stats(working_dirs)
     
     #TODO get statistics

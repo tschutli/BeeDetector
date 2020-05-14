@@ -76,7 +76,7 @@ def detect_colors(working_dir,frame_queue,labels,progress_callback=None, pause_e
                 continue
                 
             
-            if index % 100 == 0:
+            if index % 2000 == 0:
                 progress_callback(index/len(bee_image_paths),working_dir)
                 with open(detected_colors_partial_path, 'wb') as f:
                     pickle.dump(detected_colors,f)

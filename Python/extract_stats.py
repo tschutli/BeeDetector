@@ -212,11 +212,6 @@ def apply_holes_to_bee_detections(detection_map,working_dir,image_size=(3840,216
     with open(detected_holes_path, 'rb') as f:
         holes = pickle.load(f)
 
-    print(holes)
-    with open(os.path.join(working_dir,"detected_holes - Kopie.pkl"), 'rb') as f:
-        holes = pickle.load(f)
-    print(holes)
-
     
     def is_id_in_frame(bee_id, frame_number):
         if frame_number in detection_map and detection_map[frame_number] != "Skipped":

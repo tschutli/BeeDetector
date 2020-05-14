@@ -70,7 +70,7 @@ def start(video_path, queue, working_dir, image_size=(640,480),progress_callback
             
     
             
-            if (frame_number) % 100 == 0:
+            if (frame_number) % 500 == 0:
                             
                 progress_callback(frame_number/no_of_frames,video_path)
                 with open(detection_map_partial_file, 'wb') as f:

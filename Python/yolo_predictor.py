@@ -66,6 +66,8 @@ def start(trained_model,frame_queue,stop_event):
             if len(stats)%100 == 0:
                 print("median_predict: " + str(statistics.median(stats)))
                 print("median_wait: " + str(statistics.median(stats_wait)))
+                print("avg_wait: " + str(statistics.mean(stats_wait)))
+
         
         except queue.Empty:
             continue
