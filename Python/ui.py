@@ -32,12 +32,9 @@ from tkinter.ttk import Frame
 from tkinter.ttk import Separator
 import sys
 import os
-from functools import partial
 import analyze_video
-from utils import constants
 from threading import Event
 import threading
-import time
 import tkinter.scrolledtext as scrolledtext
 import datetime
 
@@ -74,7 +71,7 @@ def pause_analyze_videos(pause_event,progress_callback):
 
 
 
-def start_analyze_videos(videos, results_folder, visualize,pause_event, progress_callback):
+def start_analyze_videos(videos, results_folder, visualize,pause_event, progress_callback, config_file_path):
     
     if not os.path.isdir(results_folder):
         messagebox.showerror("Error", "The Results Folder is not a valid folder. Please check the spelling.")
@@ -90,7 +87,7 @@ def start_analyze_videos(videos, results_folder, visualize,pause_event, progress
         
     #analyze_video.analyze_videos(constants.bee_model_path, constants.hole_model_path, videos, results_folder, visualize, progress_callback, pause_event)
     global analyze_videos_thread
-    my_args=(constants.bee_model_path, constants.hole_model_path, constants.color_model_path, constants.number_model_path, videos, results_folder, visualize, progress_callback, pause_event,)
+    my_args=(videos, results_folder, visualize, progress_callback, pause_event,config_file_path)
     analyze_videos_thread = threading.Thread(target=analyze_video.analyze_videos, args=my_args)
     analyze_videos_thread.daemon = True
     analyze_videos_thread.start()
@@ -113,7 +110,7 @@ def start_ui():
     
     main_window = Tk()
     main_window.geometry(str(window_width) + "x" + str(window_height))
-    #main_window.iconbitmap(resource_path('bee.ico'))
+    main_window.iconbitmap(resource_path('bee.ico'))
     
     
     main_window.title("Bee Movement Analyzer")
@@ -222,6 +219,22 @@ def start_ui():
     open_output_label.grid(column=0, row=11, pady=5, padx = 5, columnspan=1, sticky=W)
     
     
+    config_file_input = Entry(tab1,width=200)
+    config_file_input.grid(column=1, row=12, pady=5, padx = 5, columnspan=2, sticky=W)
+    
+    def getConfigFilePath():
+        input_file = filedialog.askopenfilename(filetypes = [("Python File", "*.py")])
+        if not input_file == "":
+            #Update UI
+            config_file_input.delete(0,END)
+            config_file_input.insert(0,input_file)
+
+    config_file_input_button = Button(tab1, text="Select Config File",command=getConfigFilePath)
+    config_file_input_button.grid(column=3, row=12, pady=5, padx = 5, sticky=W)
+    config_file_label = Label(tab1,justify=LEFT, text="Config File (optional): ")
+    config_file_label.grid(column=0, row=12, pady=5, padx = 5, columnspan=1, sticky=W)
+
+    
     visualize_variable = IntVar()
     check_button = Checkbutton(tab1, text="Visualize Results", variable=visualize_variable)
     check_button.grid(column=1, row=13, pady=5, padx = 5, columnspan=2, sticky=W)
@@ -276,7 +289,7 @@ def start_ui():
 
     
     
-    run_button.configure(state="normal",command=lambda: start_analyze_videos(convert_paths_list(video_paths_input.get()),output_path_input.get(),visualize_variable.get(),pause_event,progress_callback))
+    run_button.configure(state="normal",command=lambda: start_analyze_videos(convert_paths_list(video_paths_input.get()),output_path_input.get(),visualize_variable.get(),pause_event,progress_callback,config_file_input.get()))
     
     run_button.grid(column=0, row=20, pady=5, padx = 5,columnspan=4, sticky='ew')
     
@@ -296,7 +309,7 @@ def start_ui():
     
     
     output_path_input.delete(0,END)
-    output_path_input.insert(0,constants.working_dir)
+    output_path_input.insert(0,"C:/Users/johan/Desktop/analysis")
     video_paths_input.delete(0,END)
     video_paths_input.insert(0,"D:/inputs/Test4_4.MP4; ")
 

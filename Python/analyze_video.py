@@ -5,10 +5,8 @@ Created on Wed Apr 15 12:52:15 2020
 @author: johan
 """
 
-from utils import constants
 import cv2
 import progressbar
-import time
 import os
 import pickle
 import queue
@@ -23,13 +21,8 @@ import numbers_predictor
 import extract_stats
 import yolo_predictor
 
-current_milli_time = lambda: int(round(time.time() * 1000))
 
-
-
-image_size = constants.tensorflow_tile_size
-min_confidence_score = 0.5
-num_threads = 6
+tensorflow_image_size = (1024,576)
 
 
 
@@ -69,9 +62,18 @@ class ProgressHelper(object):
 
 
 
-
-def analyze_videos(trained_bee_model, trained_hole_model, trained_colors_model, trained_numbers_model, input_videos, working_dir, visualize=True, progress_callback=None, pause_event=None):
+def analyze_videos(input_videos, working_dir, visualize=True, progress_callback=None, pause_event=None,config_file_path=None):
     
+    #Load config file parameters
+    if not config_file_path:
+        import config
+    else:
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("config", config_file_path)
+        config = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(config)
+    
+        
     working_dirs = []
     for input_video in input_videos:
         video_dir = os.path.join(working_dir, os.path.basename(input_video))
@@ -81,18 +83,18 @@ def analyze_videos(trained_bee_model, trained_hole_model, trained_colors_model, 
         os.makedirs(video_dir,exist_ok=True)
           
     
-    detect_bees(trained_bee_model,input_videos,working_dirs, progress_callback, pause_event)
+    detect_bees(config.trained_bee_model,input_videos,working_dirs, progress_callback, pause_event, config.num_worker_threads)
     
-    detect_holes(trained_hole_model,input_videos,working_dirs,progress_callback, pause_event)
+    detect_holes(config.trained_hole_model,input_videos,working_dirs,progress_callback, pause_event, config.num_worker_threads)
 
-    detect_colors(trained_colors_model,working_dirs,progress_callback,pause_event)
+    detect_colors(config.trained_colors_model,working_dirs,progress_callback,pause_event, config.num_worker_threads)
     
-    detect_numbers(trained_numbers_model,working_dirs,progress_callback,pause_event)
+    detect_numbers(config.trained_numbers_model,working_dirs,progress_callback,pause_event)
     
     if pause_event != None and pause_event.is_set():
         return
 
-    extract_stats.extract_stats(working_dirs)
+    extract_stats.extract_stats(working_dirs,config.max_tracking_distance_factor,config.hole_area_factor,config.min_consecutive_frames_to_track_bee)
     
     #TODO get statistics
     
@@ -108,7 +110,7 @@ def detect_numbers(trained_numbers_model,working_dirs,progress_callback=None,pau
     numbers_predictor.start(trained_numbers_model,working_dirs,pause_event,progress_helper.control_progress_callback)
 
 
-def detect_colors(trained_colors_model,working_dirs,progress_callback=None,pause_event=None):
+def detect_colors(trained_colors_model,working_dirs,progress_callback=None,pause_event=None,num_threads=2):
     progress_helper = ProgressHelper(working_dirs,progress_callback,"detect_colors")
     
     
@@ -135,7 +137,7 @@ def detect_colors(trained_colors_model,working_dirs,progress_callback=None,pause
 
 
     
-def detect_holes(trained_hole_model, input_videos, working_dirs,progress_callback=None, pause_event=None):
+def detect_holes(trained_hole_model, input_videos, working_dirs,progress_callback=None, pause_event=None,num_threads=2):
     
     
     progress_helper = ProgressHelper(working_dirs,progress_callback,"detect_holes")
@@ -145,7 +147,7 @@ def detect_holes(trained_hole_model, input_videos, working_dirs,progress_callbac
     with ThreadPoolExecutor(max_workers=num_threads) as executor:
         futures = []
         for (input_video,working_dir) in zip(input_videos,working_dirs):
-            future = executor.submit(hole_analysis.hole_frame_reader,working_dir,frame_queue,image_size,progress_helper.control_progress_callback, pause_event)
+            future = executor.submit(hole_analysis.hole_frame_reader,working_dir,frame_queue,tensorflow_image_size,progress_helper.control_progress_callback, pause_event)
             
             futures.append(future)
         
@@ -170,10 +172,9 @@ def detect_holes(trained_hole_model, input_videos, working_dirs,progress_callbac
     
     
     
-def detect_bees(trained_bee_model,input_videos,working_dirs, progress_callback=None, pause_event=None):
+def detect_bees(trained_bee_model,input_videos,working_dirs, progress_callback=None, pause_event=None,num_threads=2):
     
         
-    #start = current_milli_time()
     
     progress_helper = ProgressHelper(input_videos,progress_callback,"detect_bees")
 
@@ -183,7 +184,7 @@ def detect_bees(trained_bee_model,input_videos,working_dirs, progress_callback=N
     with ThreadPoolExecutor(max_workers=num_threads) as executor:
         futures = []
         for (input_video,working_dir) in zip(input_videos,working_dirs):
-            future = executor.submit(frame_reader.start, input_video, frame_queue, working_dir,image_size,progress_helper.control_progress_callback,pause_event)
+            future = executor.submit(frame_reader.start, input_video, frame_queue, working_dir,tensorflow_image_size,progress_helper.control_progress_callback,pause_event)
             futures.append(future)
         
         
@@ -202,7 +203,7 @@ def detect_bees(trained_bee_model,input_videos,working_dirs, progress_callback=N
 
 
     
-def visualize_videos(input_videos,working_dirs,progress_callback=None, pause_event=None):
+def visualize_videos(input_videos,working_dirs,progress_callback=None, pause_event=None,num_threads=2):
     
     progress_helper = ProgressHelper(input_videos,progress_callback,"visualize")
     
@@ -226,10 +227,8 @@ def visualize_videos(input_videos,working_dirs,progress_callback=None, pause_eve
     
 
 
-def visualize(input_video,detection_map,output_path,progress_callback=None, pause_event=None,image_size=(2048,1156)):
-    #start = current_milli_time()
-    #cap = cv2.VideoCapture(input_video)
-    #cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+def visualize(input_video,detection_map,output_path,progress_callback=None, pause_event=None,image_size=tensorflow_image_size):
+
     if pause_event != None and pause_event.is_set():
         return
     
@@ -246,7 +245,7 @@ def visualize(input_video,detection_map,output_path,progress_callback=None, paus
     frame_number = 0
     for frame_number in progressbar.progressbar(range(0,no_of_frames)):
         
-        if frame_number > 10000: 
+        if frame_number > 100000: 
             break
     
         if frame_number % 100 == 0:
@@ -261,15 +260,8 @@ def visualize(input_video,detection_map,output_path,progress_callback=None, paus
         if not ret:
             print("BREAK")
             break
-        #print("",flush=True)
-        
-        #print("1: " + str(current_milli_time()-start))
 
         image = cv2.resize(image, image_size)
-        #start = current_milli_time()
-        #cv2.imwrite(output_path[:-4] + ".jpg",image)
-        
-        #print("2: " + str(current_milli_time()-start), flush=True)
         
         if not frame_number in detection_map:
             print("Did not find frame " + str(frame_number) + " in detection_map.")
@@ -315,11 +307,8 @@ def visualize(input_video,detection_map,output_path,progress_callback=None, paus
                         
                         
 
-        #print("3: " + str(current_milli_time()-start), flush=True)
-        if detection_map[frame_number] != "Skipped":
-            out.write(image)
-            #print("4: " + str(current_milli_time()-start), flush=True)
-            #print("", flush=True)
+        #if detection_map[frame_number] != "Skipped":
+        out.write(image)
 
     cap.release() 
     out.release()
@@ -337,12 +326,9 @@ if __name__== "__main__":
         print(progress)
     
     pause_event = Event()
-    bee_model_path = constants.bee_model_path
-    hole_model_path = constants.hole_model_path
-    color_model_path = constants.color_model_path
-    number_model_path = constants.number_model_path
+    from utils import constants
     input_videos = constants.input_videos
     working_dir = constants.working_dir
-    analyze_videos(bee_model_path, hole_model_path, color_model_path, number_model_path, input_videos, working_dir,progress_callback=progress_callback,pause_event=pause_event)
+    analyze_videos(input_videos, working_dir,progress_callback=progress_callback,pause_event=pause_event)
     
     

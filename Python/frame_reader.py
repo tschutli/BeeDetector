@@ -10,7 +10,6 @@ from PIL import Image
 import numpy as np
 from threading import Event
 import os
-from utils import file_utils
 from utils import eval_utils
 from dataclasses import dataclass, field
 from typing import Any
@@ -27,7 +26,7 @@ class PrioritizedItem:
     item: Any=field(compare=False)
 
 
-def start(video_path, queue, working_dir, image_size=(640,480),progress_callback=None, pause_event=None):
+def start(video_path, queue, working_dir, image_size=(1024,576),progress_callback=None, pause_event=None):
     
     if pause_event != None and pause_event.is_set():
         return
@@ -59,7 +58,7 @@ def start(video_path, queue, working_dir, image_size=(640,480),progress_callback
     
         cap = cv2.VideoCapture(video_path)
         no_of_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))  
-        fps = int(cap.get(cv2.CAP_PROP_FPS))
+        #fps = int(cap.get(cv2.CAP_PROP_FPS))
         #print("Number of frames: " + str(no_of_frames))
         #start_frame = int(no_of_frames / num_processes)* thread_id
         #end_frame = int(no_of_frames / num_processes)* (thread_id+1)
@@ -70,7 +69,7 @@ def start(video_path, queue, working_dir, image_size=(640,480),progress_callback
             
     
             
-            if (frame_number) % 500 == 0:
+            if (frame_number) % 100 == 0:
                             
                 progress_callback(frame_number/no_of_frames,video_path)
                 with open(detection_map_partial_file, 'wb') as f:

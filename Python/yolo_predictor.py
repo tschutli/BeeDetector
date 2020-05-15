@@ -14,16 +14,14 @@ from keras import backend as K
 from keras.models import load_model
 from keras.layers import Input
 from PIL import Image, ImageFont, ImageDraw
-from object_detection.utils import visualization_utils
+#from object_detection.utils import visualization_utils
 from yolo3.model import yolo_eval, yolo_body, tiny_yolo_body
 from yolo3.utils import letterbox_image
-import os
 from keras.utils import multi_gpu_model
 from utils import file_utils
 import time
 import progressbar
 current_milli_time = lambda: int(round(time.time() * 1000))
-import tensorflow as tf
 import statistics
 import queue
 from dataclasses import dataclass, field
@@ -76,7 +74,7 @@ def start(trained_model,frame_queue,stop_event):
     print("Quitting prediction Thread")
 
 
-
+'''
 def predict(model_path,images_to_predict,output_folder,classes,visualize_groundtruths=False,visualize_predictions=True,visualize_scores=True,visualize_names=True):
     
     yolo = YOLO(model_path=model_path)
@@ -131,7 +129,7 @@ def predict(model_path,images_to_predict,output_folder,classes,visualize_groundt
         if visualize_groundtruths or visualize_predictions:
             image_output_path = os.path.join(output_folder, os.path.basename(image_path))
             image.save(image_output_path)
-
+'''
 
 
 class YOLO(object):
@@ -337,4 +335,4 @@ if __name__== "__main__":
     output_folder = "C:/Users/johan/Desktop/test"
     classes = ["green","white","yellow"]
     
-    predict(model_path,images_to_predict,output_folder,classes)
+    #predict(model_path,images_to_predict,output_folder,classes)

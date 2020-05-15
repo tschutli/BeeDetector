@@ -10,15 +10,6 @@ import pickle
 from datetime import timedelta
 
 
-min_consecutive_frames_to_be_counted = 3
-
-#A start of a flight is only counted if the area of the bee detection bounding 
-#box is smaller than hole_area_factor*average_hole_area
-hole_area_factor = 1.2
-
-#A bee will only be tracked over time if it is not further apart than 
-#(MAX_TRACKING_DISTANCE_FACTOR*average_hole_height) in two consecutive frames
-MAX_TRACKING_DISTANCE_FACTOR = 1.4
 
 image_size=(3840,2160)
 
@@ -26,7 +17,7 @@ image_size=(3840,2160)
 
 
 
-def extract_stats(working_dirs):
+def extract_stats(working_dirs,max_tracking_distance_factor,hole_area_factor,min_consecutive_frames_to_track_bee):
     
     for working_dir in working_dirs:
         
@@ -36,9 +27,9 @@ def extract_stats(working_dirs):
             detection_map = pickle.load(f)
         
         
-        enumerate_bee_detections(detection_map,working_dir,image_size)
+        enumerate_bee_detections(detection_map,working_dir,image_size,max_tracking_distance_factor,min_consecutive_frames_to_track_bee)
         
-        apply_holes_to_bee_detections(detection_map,working_dir,image_size=image_size)
+        apply_holes_to_bee_detections(detection_map,working_dir,image_size,hole_area_factor)
         
         filter_numbers_and_colors(detection_map)
         
@@ -201,7 +192,7 @@ def get_average_hole_area(holes,image_size=(3840,2160)):
         
         
     
-def apply_holes_to_bee_detections(detection_map,working_dir,image_size=(3840,2160)):
+def apply_holes_to_bee_detections(detection_map,working_dir,image_size=(3840,2160),hole_area_factor=1.2):
     
             
     
@@ -315,7 +306,7 @@ def get_average_hole_height(holes,image_size=(3840,2160)):
         
     
         
-def enumerate_bee_detections(detection_map,working_dir,image_size=(3840,2160)):
+def enumerate_bee_detections(detection_map,working_dir,image_size=(3840,2160),max_tracking_distance_factor=1.4,min_consecutive_frames_to_track_bee=3):
     
     #TODO: Make sure that bees are kept being tracked even if for one or two frames the object detection algorithm didn't detect them
     
@@ -327,7 +318,7 @@ def enumerate_bee_detections(detection_map,working_dir,image_size=(3840,2160)):
     with open(detected_holes_path, 'rb') as f:
         holes = pickle.load(f)
     
-    MAX_SQUARED_DISTANCE = pow(get_average_hole_height(holes,image_size)*MAX_TRACKING_DISTANCE_FACTOR,2)
+    MAX_SQUARED_DISTANCE = pow(get_average_hole_height(holes,image_size)*max_tracking_distance_factor,2)
     
         
     current_bee_index = 0
@@ -434,7 +425,7 @@ def enumerate_bee_detections(detection_map,working_dir,image_size=(3840,2160)):
     while frame_number in detection_map:
         if frame_number in detection_map and detection_map[frame_number] != "Skipped":
             for detection in detection_map[frame_number]:
-                if bee_id_count[detection["id"]] < min_consecutive_frames_to_be_counted:
+                if bee_id_count[detection["id"]] < min_consecutive_frames_to_track_bee:
                     detection["id"] = -1
         frame_number += 1
 

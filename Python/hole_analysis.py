@@ -18,7 +18,7 @@ import numpy as np
 from threading import Event
 
 
-min_confidence_score = 0.5
+min_confidence_score = 0.4
 
 @dataclass(order=True)
 class PrioritizedItem:
