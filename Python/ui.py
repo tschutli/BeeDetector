@@ -255,9 +255,9 @@ def start_ui():
         elif progress == "started_stopping_script":
             run_button.configure(text="Please wait...", state="disabled")
         elif progress == "stopped_script":
-            run_button.configure(text="Start", state="normal", command=lambda: start_analyze_videos(convert_paths_list(video_paths_input.get()),output_path_input.get(),visualize_variable.get(),pause_event,progress_callback))
+            run_button.configure(text="Start", state="normal", command=lambda: start_analyze_videos(convert_paths_list(video_paths_input.get()),output_path_input.get(),visualize_variable.get(),pause_event,progress_callback,config_file_input.get()))
         elif progress == "Success. All videos are analyzed!":
-            run_button.configure(text="Start", state="normal", command=lambda: start_analyze_videos(convert_paths_list(video_paths_input.get()),output_path_input.get(),visualize_variable.get(),pause_event,progress_callback))
+            run_button.configure(text="Start", state="normal", command=lambda: start_analyze_videos(convert_paths_list(video_paths_input.get()),output_path_input.get(),visualize_variable.get(),pause_event,progress_callback,config_file_input.get()))
             progress_callback("Success. All videos are analyzed.")
         elif type(progress) == tuple:
             if type(progress[1]) == float:

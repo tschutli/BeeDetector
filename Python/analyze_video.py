@@ -83,13 +83,13 @@ def analyze_videos(input_videos, working_dir, visualize=True, progress_callback=
         os.makedirs(video_dir,exist_ok=True)
           
     
-    detect_bees(config.trained_bee_model,input_videos,working_dirs, progress_callback, pause_event, config.num_worker_threads)
+    detect_bees(config.bee_model_path,input_videos,working_dirs, progress_callback, pause_event, config.num_worker_threads)
     
-    detect_holes(config.trained_hole_model,input_videos,working_dirs,progress_callback, pause_event, config.num_worker_threads)
+    detect_holes(config.hole_model_path,input_videos,working_dirs,progress_callback, pause_event, config.num_worker_threads)
 
-    detect_colors(config.trained_colors_model,working_dirs,progress_callback,pause_event, config.num_worker_threads)
+    detect_colors(config.color_model_path,working_dirs,progress_callback,pause_event, config.num_worker_threads)
     
-    detect_numbers(config.trained_numbers_model,working_dirs,progress_callback,pause_event)
+    detect_numbers(config.number_model_path,working_dirs,progress_callback,pause_event)
     
     if pause_event != None and pause_event.is_set():
         return
@@ -99,7 +99,7 @@ def analyze_videos(input_videos, working_dir, visualize=True, progress_callback=
     #TODO get statistics
     
     if visualize:
-        visualize_videos(input_videos,working_dirs,progress_callback, pause_event)
+        visualize_videos(input_videos,working_dirs,progress_callback, pause_event,config.num_worker_threads,config.visualization_video_size)
     
     if pause_event != None and not pause_event.is_set():
         progress_callback("Success. All videos are analyzed!")
@@ -203,7 +203,7 @@ def detect_bees(trained_bee_model,input_videos,working_dirs, progress_callback=N
 
 
     
-def visualize_videos(input_videos,working_dirs,progress_callback=None, pause_event=None,num_threads=2):
+def visualize_videos(input_videos,working_dirs,progress_callback=None, pause_event=None,num_threads=2,image_size=tensorflow_image_size):
     
     progress_helper = ProgressHelper(input_videos,progress_callback,"visualize")
     
@@ -217,7 +217,7 @@ def visualize_videos(input_videos,working_dirs,progress_callback=None, pause_eve
             with open(os.path.join(working_dir,"combined_detections.pkl"), 'rb') as f:
                 detection_map = pickle.load(f)
             
-            future = executor.submit(visualize, input_video, detection_map, os.path.join(working_dir,"visualization.MP4"),progress_helper.control_progress_callback,pause_event)
+            future = executor.submit(visualize, input_video, detection_map, os.path.join(working_dir,"visualization.MP4"),progress_helper.control_progress_callback,pause_event,image_size)
             futures.append(future)
 
         for future in futures:
