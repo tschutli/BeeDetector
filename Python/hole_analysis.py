@@ -87,7 +87,7 @@ def hole_frame_reader(working_dir,frame_queue,image_size,progress_callback=None,
     
         print("Detected " + str(len(holes)) + " holes: " + os.path.basename(working_dir),flush=True)
         
-            
+        enumerate_holes(holes)
         src_image = image_paths[index_of_most_frequent_answer]
         detected_holes_image_path=detected_holes_xml_path[:-4] + ".jpg"
         save_holes_predictions_image(holes,src_image,detected_holes_image_path)
