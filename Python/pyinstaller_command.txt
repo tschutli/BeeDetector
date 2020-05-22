@@ -1,1 +1,1 @@
-pyinstaller --hidden-import="pkg_resources.py2_warn" --add-data "bee.ico";"." --icon bee.ico --noconsole ui.py
+pyinstaller --hidden-import="pkg_resources.py2_warn" --add-data "bee.ico";"." --add-data "opencv_ffmpeg341_64.dll";"." --icon bee.ico --noconsole ui.py

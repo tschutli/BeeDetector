@@ -195,7 +195,7 @@ def get_detections(resized_image,queue,priority,min_confidence_score = 0.5):
             right = detections_dict['detection_boxes'][i][3]
             detection_class = detections_dict['detection_classes'][i]
             #TODO: Make sure class 2 is always bee
-            if detection_class == 2:
+            if detection_class == 1:
                 detection_name = "bee"
             else:
                 detection_name = "bee flying"
