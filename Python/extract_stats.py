@@ -8,6 +8,7 @@ Created on Fri May  8 14:20:00 2020
 import os
 import pickle
 from datetime import timedelta
+import agroscope_metrics_extraction
 
 
 
@@ -16,8 +17,7 @@ image_size=(3840,2160)
 
 
 
-
-def extract_stats(working_dirs,max_tracking_distance_factor,hole_area_factor,min_consecutive_frames_to_track_bee):
+def extract_stats(working_dirs,config):
     
     for working_dir in working_dirs:
         
@@ -27,20 +27,24 @@ def extract_stats(working_dirs,max_tracking_distance_factor,hole_area_factor,min
             detection_map = pickle.load(f)
         
         
-        enumerate_bee_detections(detection_map,working_dir,image_size,max_tracking_distance_factor,min_consecutive_frames_to_track_bee)
+        enumerate_bee_detections(detection_map,working_dir,image_size,config.max_tracking_distance_factor,config.min_consecutive_frames_to_track_bee)
         
-        apply_holes_to_bee_detections(detection_map,working_dir,image_size,hole_area_factor)
+        apply_holes_to_bee_detections(detection_map,working_dir,image_size,config.hole_area_factor)
         
         filter_numbers_and_colors(detection_map)
         
         with open(os.path.join(working_dir,"combined_detections.pkl"), 'wb') as f:
             pickle.dump(detection_map,f)
 
-        write_starts_and_ends_to_file(detection_map,working_dir)
+        all_events_unfiltered_csv_file = os.path.join(working_dir,"all_events_unfiltered.csv")
+        write_starts_and_ends_to_file(detection_map,all_events_unfiltered_csv_file)
         
+        agroscope_metrics_extraction.extract_agroscope_metrics(all_events_unfiltered_csv_file,working_dir,config.min_nest_time,config.min_fly_time)
         
+    
+    
 
-def write_starts_and_ends_to_file(detection_map,working_dir):
+def write_starts_and_ends_to_file(detection_map,all_events_unfiltered_csv_file):
     
     def is_id_in_frame(bee_id, frame_number):
         if frame_number in detection_map and detection_map[frame_number] != "Skipped":
@@ -50,12 +54,11 @@ def write_starts_and_ends_to_file(detection_map,working_dir):
         return False
 
     
-    csv_file = os.path.join(working_dir,"all_events.csv")
-    if os.path.exists(csv_file):
-        os.remove(csv_file)
+    if os.path.exists(all_events_unfiltered_csv_file):
+        os.remove(all_events_unfiltered_csv_file)
     
     
-    with open(csv_file, 'a') as f:
+    with open(all_events_unfiltered_csv_file, 'a') as f:
         f.write("TIME,BEE,ACTION,HOLE\n")
         fps = 25
         

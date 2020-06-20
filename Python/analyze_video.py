@@ -95,9 +95,7 @@ def analyze_videos(input_videos, working_dir, visualize=True, progress_callback=
         return
 
     extract_stats.extract_stats(working_dirs,config.max_tracking_distance_factor,config.hole_area_factor,config.min_consecutive_frames_to_track_bee)
-    
-    #TODO get statistics
-    
+        
     if visualize:
         visualize_videos(input_videos,working_dirs,progress_callback, pause_event,config.num_worker_threads,config.visualization_video_size)
     

@@ -36,7 +36,22 @@ min_consecutive_frames_to_track_bee = 3
 
 
 '''
-The following variables define the trained deep learning model paths.
+The min_nest_time denotes the minimal time, a bee has to stay inside a hole to qualify 
+for residency. (in milliseconds)
+'''
+min_nest_time = 40000
+
+
+'''
+The min_fly_time denotes the minimal time a bee has to be in flight after leaving
+a hole to qualify for residency. (in milliseconds)
+'''
+min_fly_time = 40000
+
+
+'''
+The following variables define the trained deep learning model paths. Make sure
+to only use forward slashes and NO BACKSLASHES in your paths.
 '''
 bee_model_path = "C:/Users/johan/Desktop/Agroscope/Models/Bee2/trained_inference_graphs/output_inference_graph_v1.pb/frozen_inference_graph.pb"
 hole_model_path = "C:/Users/johan/Desktop/Agroscope/Models/Holes2/trained_inference_graphs/output_inference_graph_v1.pb/frozen_inference_graph.pb"
