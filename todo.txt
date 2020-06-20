@@ -1,0 +1,5 @@
+Make training process nice
+Write documentation
+create metrics extraction (Flurin)
+
+config file

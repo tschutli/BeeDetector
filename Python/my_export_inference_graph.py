@@ -165,4 +165,4 @@ def run(project_dir,look_in_checkpoints_dir = True, model_selection_criterion="f
 
 if __name__ == '__main__':
     project_dir = constants.project_folder
-    run(project_dir,checkpoint=17500)
+    run(project_dir)

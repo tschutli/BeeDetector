@@ -119,7 +119,7 @@ def start_ui():
     
     
     
-    description = "Choose a results folder and one or more input videos that should be analyzed. Please separate your input video paths with semicolons! If you enable the 'Visualize Results' option, the program will save the videos to the results folder with all bee detections visualized. Note that by enabling this option, more compute time is needed. The program will then analyze all videos and save all results to the results folder. Make sure that there is enough space in the results folder, especially if you enable the 'Visualize Results' option.\n\nShould you wish to pause the program, click the 'Pause' button and wait a few seconds until the program has paused all computations."
+    description = "Choose a results folder and one or more input videos that should be analyzed. Please separate your input video paths with semicolons! If you enable the 'Visualize Results' option, the program will save the videos to the results folder with all bee detections visualized. Note that by enabling this option, more compute time is needed. The program will analyze all videos and save all results to the results folder. Make sure that there is enough space in the results folder, especially if you enable the 'Visualize Results' option.\n\nShould you wish to pause the program, click the 'Pause' button and wait until the program has paused all computations. This can take up to a few minutes. The computation can later be resumed. Please read the documentation PDF for further information."
 
     
     '''Init Tab 1'''
@@ -309,9 +309,9 @@ def start_ui():
     
     
     output_path_input.delete(0,END)
-    output_path_input.insert(0,"C:/Users/johan/Desktop/analysis")
+    output_path_input.insert(0,"C:/Users/johan/Downloads/tes")
     video_paths_input.delete(0,END)
-    video_paths_input.insert(0,"D:/inputs/Test4_4.MP4; ")
+    video_paths_input.insert(0,"C:/Users/johan/Downloads/Test4_4.MP4; ")
 
 
     
