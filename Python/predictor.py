@@ -27,7 +27,7 @@ def start(trained_model,frame_queue,stop_event):
     stats_wait = []
 
     
-    detection_graph = get_detection_graph(trained_model)
+    detection_graph = get_detection_graph(trained_model + "/frozen_inference_graph.pb")
     with detection_graph.as_default():
         with tf.Session() as sess:
             

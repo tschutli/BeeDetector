@@ -308,14 +308,6 @@ def start_ui():
     
     
     
-    output_path_input.delete(0,END)
-    output_path_input.insert(0,"C:/Users/johan/Downloads/tes")
-    video_paths_input.delete(0,END)
-    video_paths_input.insert(0,"C:/Users/johan/Downloads/Test4_4.MP4; ")
-
-
-    
-    
     
     
     main_window.mainloop()

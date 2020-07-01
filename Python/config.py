@@ -20,6 +20,7 @@ A bee will only be tracked over time if it is not further apart than
 '''
 max_tracking_distance_factor = 1.4
 
+
 '''
 A start of a flight is only counted if the area of the bee detection bounding 
 box is smaller than hole_area_factor*average_hole_area.
@@ -53,9 +54,9 @@ min_fly_time = 40000
 The following variables define the trained deep learning model paths. Make sure
 to only use forward slashes and NO BACKSLASHES in your paths.
 '''
-bee_model_path = "C:/Users/johan/Desktop/Agroscope/Models/Bee2/trained_inference_graphs/output_inference_graph_v1.pb/frozen_inference_graph.pb"
-hole_model_path = "C:/Users/johan/Desktop/Agroscope/Models/Holes2/trained_inference_graphs/output_inference_graph_v1.pb/frozen_inference_graph.pb"
-color_model_path = "C:/Users/johan/Desktop/Agroscope/Models/Colors_yolo/trained_model.h5"
-number_model_path = "C:/Users/johan/Desktop/Agroscope/Models/Numbers/trained_model.h5"
+bee_model_path = "bee_model"
+hole_model_path = "hole_model"
+color_model_path = "color_model.h5"
+number_model_path = "number_model.h5"
 
 
