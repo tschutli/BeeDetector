@@ -94,7 +94,7 @@ def analyze_videos(input_videos, working_dir, visualize=True, progress_callback=
     if pause_event != None and pause_event.is_set():
         return
 
-    extract_stats.extract_stats(working_dirs,config.max_tracking_distance_factor,config.hole_area_factor,config.min_consecutive_frames_to_track_bee)
+    extract_stats.extract_stats(working_dirs,config)
         
     if visualize:
         visualize_videos(input_videos,working_dirs,progress_callback, pause_event,config.num_worker_threads,config.visualization_video_size)
@@ -242,10 +242,7 @@ def visualize(input_video,detection_map,output_path,progress_callback=None, paus
 
     frame_number = 0
     for frame_number in progressbar.progressbar(range(0,no_of_frames)):
-        
-        if frame_number > 100000: 
-            break
-    
+            
         if frame_number % 100 == 0:
             progress_callback(frame_number/no_of_frames,input_video)
         
@@ -325,8 +322,8 @@ if __name__== "__main__":
     
     pause_event = Event()
     from utils import constants
-    input_videos = constants.input_videos
-    working_dir = constants.working_dir
+    input_videos = ["E:/input/MVI_0003.MP4"]
+    working_dir = "E:/output"
     analyze_videos(input_videos, working_dir,progress_callback=progress_callback,pause_event=pause_event)
     
     

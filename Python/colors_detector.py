@@ -71,10 +71,7 @@ def detect_colors(working_dir,frame_queue,labels,progress_callback=None, pause_e
             
             frame_number = int(re.search('frame(.*)_detection', bee_image_path).group(1))
             detection_number = int(re.search('_detection(.*).png', bee_image_path).group(1))
-            
-            if "color" in detected_colors[frame_number][detection_number]:
-                continue
-                
+                            
             
             if index % 1000 == 0:
                 progress_callback(index/len(bee_image_paths),working_dir)
@@ -82,7 +79,10 @@ def detect_colors(working_dir,frame_queue,labels,progress_callback=None, pause_e
                     pickle.dump(detected_colors,f)
                 if pause_event != None and pause_event.is_set():
                     return
-            
+                
+            if "color" in detected_colors[frame_number][detection_number]:
+                continue
+
             if detected_colors[frame_number][detection_number]["id"] == -1:
                 continue
 

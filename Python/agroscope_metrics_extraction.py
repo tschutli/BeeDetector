@@ -157,6 +157,8 @@ def extract_agroscope_metrics(csv_file_name, output_folder, min_nest_time=40000,
     # hole-based error check: check for double leave or enter of same bee on each hole
     nest_index = 0
     for line in data:
+        if len(data) < 2:
+            break
         next_line = data[nest_index + 1]
         # check if next line is still same nest
         if line[3] == next_line[3]:
@@ -182,6 +184,8 @@ def extract_agroscope_metrics(csv_file_name, output_folder, min_nest_time=40000,
     # bee-based error check: check if leave for every enter of each bee's movements exists
     bee_index = 0
     for line in data:
+        if len(data) < 2:
+            break
         next_line = data[bee_index + 1]
         # check if next line is still about the same bee
         if line[1] == next_line[1]:
@@ -199,6 +203,8 @@ def extract_agroscope_metrics(csv_file_name, output_folder, min_nest_time=40000,
     # find residences (a separate for loop is used for clarity)
     bee_index = 0
     for line in data:
+        if len(data) < 3:
+            break
         # check if next two lines are still about the same bee
         if line[1] == data[bee_index + 1][1] == data[bee_index + 2][1]:
             check_resident(bee_index)

@@ -38,19 +38,19 @@ def start(trained_model,working_dirs,stop_event,progress_callback):
 
         detected_numbers_path = os.path.join(working_dir,"detected_numbers")
         all_images = file_utils.get_all_image_paths_in_folder(detected_numbers_path)
-
-        X_matrix = get_data(detected_numbers_path)
-        results = model.predict(X_matrix)
-        
-        
-        scores = np.max(results,axis=1)
-        labels = np.argmax(results, axis = 1)
-        
-        for score, label,image_path in zip(scores,labels,all_images):
-            frame_number = int(re.search('frame(.*)_detection', image_path).group(1))
-            detection_number = int(re.search('_detection(.*).png', image_path).group(1))
-            detection_map[frame_number][detection_number]["number"] = str(label)
-            detection_map[frame_number][detection_number]["number_score"] = score
+        if len(all_images) > 0:
+            X_matrix = get_data(detected_numbers_path)
+            results = model.predict(X_matrix)
+            
+            
+            scores = np.max(results,axis=1)
+            labels = np.argmax(results, axis = 1)
+            
+            for score, label,image_path in zip(scores,labels,all_images):
+                frame_number = int(re.search('frame(.*)_detection', image_path).group(1))
+                detection_number = int(re.search('_detection(.*).png', image_path).group(1))
+                detection_map[frame_number][detection_number]["number"] = str(label)
+                detection_map[frame_number][detection_number]["number_score"] = score
 
         
         with open(os.path.join(working_dir,"detected_numbers.pkl"), 'wb') as f:
