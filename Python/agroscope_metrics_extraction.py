@@ -97,10 +97,10 @@ def extract_agroscope_metrics(csv_file_name, output_folder, min_nest_time=40000,
         drunkenness = 0
         correction = 0
         # make sure to keep track on the same bee
-        while data[index + (2 * drunkenness) + 2][1] == bee:
+        while len(data) > index + (2 * drunkenness) + 2 and data[index + (2 * drunkenness) + 2][1] == bee:
             # check if bee has found it's home (with valid enter movement)
             if data[index + (2 * drunkenness) + 2][3] == home and data[index + (2 * drunkenness) + 2][2] == 'Enter':
-                # print(str(bee) + " flew to " + str(drunkenness) + " holes before finding it's nest " + str(home))
+                #print(str(bee) + " flew to " + str(drunkenness) + " holes before finding it's nest " + str(home))
                 boozer_book.append([bee, drunkenness - correction])
     
                 time_back_home = data[index + (2 * drunkenness) + 2][0]
@@ -110,7 +110,9 @@ def extract_agroscope_metrics(csv_file_name, output_folder, min_nest_time=40000,
                 return
     
             # make sure to correct for inserted missing movements
-            if "Missing" in data[index + (2 * drunkenness) + 2][2] or "Missing" in data[index + (2 * drunkenness) + 3][2]:
+            if "Missing" in data[index + (2 * drunkenness) + 2][2]:
+                correction += 1
+            elif len(data) > index + (2 * drunkenness) + 3 and "Missing" in data[index + (2 * drunkenness) + 3][2] and data[index + (2 * drunkenness) + 3][1] == bee:
                 correction += 1
     
             drunkenness += 1
