@@ -11,6 +11,7 @@ import statistics
 import queue
 from dataclasses import dataclass, field
 from typing import Any
+from PIL import Image
 
 
 @dataclass(order=True)
@@ -34,7 +35,12 @@ def start(trained_model,frame_queue,stop_event):
             tensor_dict = get_tensor_dict()
             image_tensor = tf.get_default_graph().get_tensor_by_name('image_tensor:0') 
 
-
+            #dummy run
+            image = Image.new('RGB', (1024,576))
+            image_np = np.asarray(image)         
+            image_expand = np.expand_dims(image_np, 0)
+            sess.run(tensor_dict,feed_dict={image_tensor: image_expand})
+            
             while not stop_event.is_set():
                 start = current_milli_time()
                 try:
