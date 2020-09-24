@@ -27,24 +27,18 @@ import xml.etree.cElementTree as ET
 from PIL import Image
 from shutil import move
 from shutil import copy
-import utils.xml_to_csv as xml_to_csv
 import random
-import utils.generate_tfrecord as generate_tfrecord
 from utils import file_utils
 import progressbar
 import sys
-import tensorflow as tf
-from google.protobuf import text_format
-from object_detection.protos import pipeline_pb2
 import urllib.request
-from object_detection.protos import preprocessor_pb2
 import pickle
 from yolo3 import convert
 
 
 
 
-def convert_annotation_folders(input_folders, test_splits, validation_splits, project_dir, model_link=constants.pretrained_model_link,tensorflow_tile_size = constants.tensorflow_tile_size):
+def convert_annotation_folders(input_folders, test_splits, validation_splits, project_dir,tensorflow_tile_size = constants.tensorflow_tile_size):
     
     """Converts the contents of a list of input folders into tensorflow readable format ready for training
 
@@ -79,7 +73,7 @@ def convert_annotation_folders(input_folders, test_splits, validation_splits, pr
 
     make_training_dir_folder_structure(project_dir)
     
-    download_pretrained_model(project_dir,model_link)
+    download_pretrained_model(project_dir)
     
     labels = {}
     train_images_dir = os.path.join(os.path.join(project_dir, "images"),"train")
@@ -157,20 +151,7 @@ def convert_annotation_folders(input_folders, test_splits, validation_splits, pr
         validation_splits[i] = validation_splits[i]/(1-min(0.9999,test_splits[i]))
     split_train_dir(train_images_dir,validation_images_dir, labels, labels_validation,"random",input_folders,validation_splits)
 
-    
-    print("Converting Annotation data into tfrecord files...")
-    train_csv = os.path.join(annotations_dir, "train_labels.csv")
-    test_csv = os.path.join(annotations_dir, "test_labels.csv")
-    xml_to_csv.xml_to_csv(train_images_dir,train_csv,flowers_to_use=labels)
-    xml_to_csv.xml_to_csv(test_images_dir,test_csv,flowers_to_use=labels)
-    
-    train_tf_record = os.path.join(annotations_dir, "train.record")
-    generate_tfrecord.make_tfrecords(train_csv,train_tf_record,train_images_dir, labels)
-    test_tf_record = os.path.join(annotations_dir, "test.record")
-    generate_tfrecord.make_tfrecords(test_csv,test_tf_record,test_images_dir, labels)
-    
-    set_config_file_parameters(project_dir,len(labels),tensorflow_tile_size)
-    
+            
     print("Training data:")
     print_labels(labels)
     print("Test data:")
@@ -476,98 +457,6 @@ def make_training_dir_folder_structure(root_folder):
 
 
 
-def set_config_file_parameters(project_dir,num_classes,tensorflow_tile_size=(640,480)):
-    """
-    Sets a whole bunch of the tensorflow pipeline config parameters (including
-    the one that defines with how many classes should be trained)
-    
-    Parameters:
-        project_dir (str): project folder path
-        num_classes (int): number of classes present in training data
-    Returns:
-        None
-    """
-    pipeline_config = pipeline_pb2.TrainEvalPipelineConfig()                                                                                                                                                                                                          
-    with tf.gfile.GFile(project_dir + "/pre-trained-model/pipeline.config", "r") as f:                                                                                                                                                                                                                     
-        proto_str = f.read()                                                                                                                                                                                                                                          
-        text_format.Merge(proto_str, pipeline_config)                                                                                                                                                                                                                 
-
-    pipeline_config.model.faster_rcnn.num_classes = num_classes
-    
-    if tensorflow_tile_size==None:
-        pipeline_config.model.faster_rcnn.image_resizer.keep_aspect_ratio_resizer.min_dimension=300
-        pipeline_config.model.faster_rcnn.image_resizer.keep_aspect_ratio_resizer.max_dimension=300
-    else:
-        pipeline_config.model.faster_rcnn.image_resizer.fixed_shape_resizer.width = tensorflow_tile_size[0]
-        pipeline_config.model.faster_rcnn.image_resizer.fixed_shape_resizer.height = tensorflow_tile_size[1]                                                                                                                                                                                       
-    
-    
-    pipeline_config.model.faster_rcnn.first_stage_max_proposals = 300
-    pipeline_config.model.faster_rcnn.second_stage_post_processing.batch_non_max_suppression.max_detections_per_class = 300                                                                                                                                                                               
-    pipeline_config.model.faster_rcnn.second_stage_post_processing.batch_non_max_suppression.max_total_detections = 300                                                                                                                                                                                
-
-    '''
-    pipeline_config.model.faster_rcnn.feature_extractor.first_stage_features_stride = 8                                                                                                                                                                                 
-    pipeline_config.model.faster_rcnn.first_stage_anchor_generator.grid_anchor_generator.height_stride = 8                                                                                                                                                                                 
-    pipeline_config.model.faster_rcnn.first_stage_anchor_generator.grid_anchor_generator.width_stride = 8                                                                                                                                                                                 
-    pipeline_config.model.faster_rcnn.first_stage_anchor_generator.grid_anchor_generator.height = 256                                                                                                                                                                               
-    pipeline_config.model.faster_rcnn.first_stage_anchor_generator.grid_anchor_generator.width = 256                                                                                                                                                                                 
-    pipeline_config.model.faster_rcnn.second_stage_post_processing.batch_non_max_suppression.score_threshold = 0.0
-    '''
-    for i in range(len(pipeline_config.train_config.optimizer.momentum_optimizer.learning_rate.manual_step_learning_rate.schedule)):
-        if i == 0:
-            pipeline_config.train_config.optimizer.momentum_optimizer.learning_rate.manual_step_learning_rate.schedule[0].step = 20000
-        if i == 1:
-            pipeline_config.train_config.optimizer.momentum_optimizer.learning_rate.manual_step_learning_rate.schedule[1].step = 70000
-        if i == 2:
-            pipeline_config.train_config.optimizer.momentum_optimizer.learning_rate.manual_step_learning_rate.schedule[2].step = 90000
-
-    
-    pre_trained_model_folder = os.path.join(project_dir,"pre-trained-model")
-    pipeline_config.train_config.fine_tune_checkpoint = os.path.join(pre_trained_model_folder,"model.ckpt")
-    
-    model_inputs_folder = os.path.join(project_dir,"model_inputs")
-    pipeline_config.train_input_reader.label_map_path = os.path.join(model_inputs_folder,"label_map.pbtxt")
-    for i in range(len(pipeline_config.train_input_reader.tf_record_input_reader.input_path)):
-        pipeline_config.train_input_reader.tf_record_input_reader.input_path.pop()
-    pipeline_config.train_input_reader.tf_record_input_reader.input_path.append(os.path.join(model_inputs_folder,"train.record"))
-    
-    
-    pipeline_config.eval_input_reader[0].label_map_path = os.path.join(model_inputs_folder,"label_map.pbtxt")
-    for i in range(len(pipeline_config.eval_input_reader[0].tf_record_input_reader.input_path)):
-        pipeline_config.eval_input_reader[0].tf_record_input_reader.input_path.pop()
-    pipeline_config.eval_input_reader[0].tf_record_input_reader.input_path.append(os.path.join(model_inputs_folder,"test.record"))
-
-
-    #set data augmentation options
-    for i in range(len(pipeline_config.train_config.data_augmentation_options)):
-        pipeline_config.train_config.data_augmentation_options.pop()
-    
-    if tensorflow_tile_size!=None:
-        d1 = pipeline_config.train_config.data_augmentation_options.add()
-        d1.random_vertical_flip.CopyFrom(preprocessor_pb2.RandomVerticalFlip()) 
-        
-        d1 = pipeline_config.train_config.data_augmentation_options.add()
-        d1.random_horizontal_flip.CopyFrom(preprocessor_pb2.RandomHorizontalFlip())  
-    
-    d1 = pipeline_config.train_config.data_augmentation_options.add()
-    d1.random_adjust_brightness.CopyFrom(preprocessor_pb2.RandomAdjustBrightness())  
-
-    d1 = pipeline_config.train_config.data_augmentation_options.add()
-    d1.random_adjust_contrast.CopyFrom(preprocessor_pb2.RandomAdjustContrast())  
-    
-    d1 = pipeline_config.train_config.data_augmentation_options.add()
-    d1.random_adjust_saturation.CopyFrom(preprocessor_pb2.RandomAdjustSaturation()) 
-    
-    d1 = pipeline_config.train_config.data_augmentation_options.add()
-    d1.random_jitter_boxes.CopyFrom(preprocessor_pb2.RandomJitterBoxes()) 
-
-    config_text = text_format.MessageToString(pipeline_config)                                                                                                                                                                                                        
-    with tf.gfile.Open(project_dir + "/pre-trained-model/pipeline.config", "wb") as f:                                                                                                                                                                                                                       
-        f.write(config_text)                                                                                                                                                                                                                                          
-
-
-
 def print_labels(labels):
     """Prints the label_count dict to the console in readable format
     
@@ -585,19 +474,7 @@ def print_labels(labels):
 
 pbar = None
 
-def download_pretrained_model(project_folder, link):
-    """
-    Downloads the pretrained model from the provided link and unpacks it into
-    the pre-trained-model folder.
-    
-    Parameters:
-        project_folder (str): the project folder pathw
-        link (str): download link of the model
-    Returns:
-        None
-    """
-
-    
+def download_pretrained_model(project_folder):    
     
     pretrained_model_folder = os.path.join(project_folder,"pre-trained-model")
     
@@ -640,9 +517,16 @@ if __name__== "__main__":
                      "C:/Users/johan/Desktop/Data/video4/colors1",
                      "C:/Users/johan/Desktop/Data/video4/colors6",
                      "C:/Users/johan/Desktop/Data/video5/colors",
-                     "C:/Users/johan/Desktop/Data/video2/colors"]
+                     "C:/Users/johan/Desktop/Data/video2/colors",
+                     "C:/Users/johan/Desktop/Data/video6/colors",
+                     "C:/Users/johan/Desktop/Data/video7/colors",
+                     "C:/Users/johan/Desktop/Data/video8/colors"
+                     ]
     
     test_splits = [0.0,
+                   0.0,
+                   0.0,
+                   0.0,
                    0.0,
                    0.0,
                    0.0,
@@ -654,10 +538,13 @@ if __name__== "__main__":
                          0.1,
                          0.1,
                          0.1,
+                         0.1,
+                         0.1,
+                         0.1,
                          0.1]
 
     #All outputs will be saved into this folder
-    project_folder = "C:/Users/johan/Desktop/test"
+    project_folder = "C:/Users/johan/Desktop/color_training"
         
     
         

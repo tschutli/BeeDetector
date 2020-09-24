@@ -177,5 +177,5 @@ def data_generator_wrapper(image_dir, batch_size, input_shape, anchors, num_clas
 
 if __name__ == '__main__':
     
-    project_folder = "C:/Users/johan/Desktop/test"
+    project_folder = "C:/Users/johan/Desktop/color_training"
     _main(project_folder)
