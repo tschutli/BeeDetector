@@ -12,6 +12,11 @@ Parameters:
     min_fly_time: time a bee has to be in flight to qualify for residency in milliseconds
 '''
 
+def seconds_to_string(seconds):
+    if seconds < 10:
+        return "0" + str(seconds)
+    return str(seconds)
+
 def extract_agroscope_metrics(csv_file_name, output_folder, min_nest_time=40000, min_fly_time=40000):
 
     # VARIABLES
@@ -36,6 +41,7 @@ def extract_agroscope_metrics(csv_file_name, output_folder, min_nest_time=40000,
     # correction principle: insert a fitting movement
     # used for hole-ordered search as well as bee-ordered search
     def correct_missing_movement(index, search_type):
+
         if debug_error_correction:
             print("--- Error Correction: " + search_type + " ---")
             print("Old:")
@@ -45,21 +51,20 @@ def extract_agroscope_metrics(csv_file_name, output_folder, min_nest_time=40000,
             print(data[index + 2])
     
         # enter: insert leave
-        if data[index][2] == 'Enter':
+        if "Enter" in data[index][2]:
             # the timestamp of the inserted leave is exactly 1 millisecond after
-            hms = data[index + 1][0].split(':')
+            hms = data[index][0].split(':')
             new_seconds = float(hms[2]) + 0.001
-            new_movement_timestamp = hms[0] + ':' + hms[1] + ':' + str(new_seconds)
-            data[index + 1: index + 1] = [[new_movement_timestamp, data[index][1], 'Missing Leave', data[index][3]]]
-    
+            new_movement_timestamp = hms[0] + ':' + hms[1] + ':' + seconds_to_string(new_seconds)
+            data.insert(index+1,[new_movement_timestamp, data[index][1], 'Missing Leave', data[index][3]])
+
         # leave: insert enter
-        elif data[index][2] == 'Leave':
+        elif 'Leave' in data[index][2]:
             # the timestamp of the inserted enter is exactly 1 millisecond before
-            hms = data[index + 1][0].split(':')
+            hms = data[index+1][0].split(':')
             new_seconds = float(hms[2]) - 0.001
-            new_movement_timestamp = hms[0] + ':' + hms[1] + ':' + str(new_seconds)
-            data[index + 1: index + 1] = [
-                [new_movement_timestamp, data[index + 1][1], 'Missing Enter', data[index + 1][3]]]
+            new_movement_timestamp = hms[0] + ':' + hms[1] + ':' + seconds_to_string(new_seconds)
+            data.insert(index+1,[new_movement_timestamp, data[index][1], 'Missing Enter', data[index+1][3]])
     
         if debug_error_correction:
             print("New:")
@@ -101,12 +106,16 @@ def extract_agroscope_metrics(csv_file_name, output_folder, min_nest_time=40000,
             # check if bee has found it's home (with valid enter movement)
             if data[index + (2 * drunkenness) + 2][3] == home and data[index + (2 * drunkenness) + 2][2] == 'Enter':
                 #print(str(bee) + " flew to " + str(drunkenness) + " holes before finding it's nest " + str(home))
-                boozer_book.append([bee, drunkenness - correction])
-    
+                boozer_book.append([time_leaving_home, bee, drunkenness - correction])
+                
                 time_back_home = data[index + (2 * drunkenness) + 2][0]
                 collection_time = timestamp_to_millis(time_back_home) - timestamp_to_millis(time_leaving_home)
-                flight_book.append([bee, millis_to_min_sec(collection_time)])
+                flight_book.append([time_leaving_home, bee, millis_to_min_sec(collection_time)])
     
+                return
+            
+            #break if bee stays inside a hole other than home for longer than min_nest_time
+            if drunkenness > 0 and timestamp_to_millis(data[index + (2 * drunkenness) + 1][0]) - timestamp_to_millis(data[index + (2 * drunkenness)][0]) > min_nest_time:
                 return
     
             # make sure to correct for inserted missing movements
@@ -153,35 +162,10 @@ def extract_agroscope_metrics(csv_file_name, output_folder, min_nest_time=40000,
             line_count += 1
         # print(f'Processed {line_count} lines.')
     
-    # sort by holes
-    data.sort(key=lambda x: x[3])
     
-    # hole-based error check: check for double leave or enter of same bee on each hole
-    nest_index = 0
-    for line in data:
-        if len(data) < 2:
-            break
-        next_line = data[nest_index + 1]
-        # check if next line is still same nest
-        if line[3] == next_line[3]:
-            # check if leave after leave or enter after enter
-            if line[2] == next_line[2]:
-                # check if same bee (found an error!)
-                if line[1] == next_line[1]:
-                    errors.append([line, "unpaired " + str(line[2]) + " on this hole"])
-                    correct_missing_movement(nest_index, "hole-based")
-                # more than one bee in same nest (found a possible multi-nest!)
-                # else:
-                #     multi_nests.append(line)
-        nest_index += 1
-        if nest_index == len(data) - 1:
-            break
-    
-    # sort again by time
-    data.sort(key=lambda x: x[0])
     
     # sort by bee
-    data.sort(key=lambda x: x[1])
+    data.sort(key=lambda x: (x[1],x[0]))
     
     # bee-based error check: check if leave for every enter of each bee's movements exists
     bee_index = 0
@@ -192,7 +176,10 @@ def extract_agroscope_metrics(csv_file_name, output_folder, min_nest_time=40000,
         # check if next line is still about the same bee
         if line[1] == next_line[1]:
             # check for enter without leave (and vice versa)
-            if line[2] == next_line[2]:
+            if line[2] == "Enter" and (next_line[2] != "Leave" or next_line[3] != line[3]):
+                errors.append([line, "missing enter or leave of bee " + str(line[1])])
+                correct_missing_movement(bee_index, "bee-based")
+            if "Leave" in line[2] and (next_line[2] != "Enter"):
                 errors.append([line, "missing enter or leave of bee " + str(line[1])])
                 correct_missing_movement(bee_index, "bee-based")
             # movement seems valid, check if resident
@@ -201,6 +188,7 @@ def extract_agroscope_metrics(csv_file_name, output_folder, min_nest_time=40000,
         bee_index += 1
         if bee_index == len(data) - 2:
             break
+    
     
     # find residences (a separate for loop is used for clarity)
     bee_index = 0
@@ -215,17 +203,18 @@ def extract_agroscope_metrics(csv_file_name, output_folder, min_nest_time=40000,
             break
     
     # sort  residential movements by nests to prepare for creation of address book
-    residential_movements.sort(key=lambda x: x[0])
+    residential_movements.sort(key=lambda x: (x[0],x[1]))
     
     # create address book from residential movements
-    movement_index = 0
     for movement in residential_movements:
         # check for duplicate movements
-        if residential_movements[movement_index + 1] != residential_movements[movement_index]:
-            address_book.append(movement)
-        movement_index += 1
-        if movement_index == len(residential_movements) - 1:
-            break
+        found = False
+        for index,address in enumerate(address_book):
+            if address[0] == movement[0] and address[1] == movement[1]:
+                found = True
+                address_book[index] = [movement[0],movement[1],address[2] + 1]
+        if not found:
+            address_book.append([movement[0],movement[1],1])
     
     # check if a nest is used by more than one bee
     address_index = 0
@@ -252,7 +241,7 @@ def extract_agroscope_metrics(csv_file_name, output_folder, min_nest_time=40000,
     # bees using a nest together with another bee may not be counted for flight book
     for multi_resident in multi_residents:
         for flight in flight_book:
-            if flight[0] == multi_resident:
+            if flight[1] == multi_resident:
                 if debug_multi_residents: print("removed a flight due to multi resident: " + str(flight))
                 flight_book.remove(flight)
     
@@ -269,23 +258,32 @@ def extract_agroscope_metrics(csv_file_name, output_folder, min_nest_time=40000,
     if debug_multi_residents:
         print("\nMulti residents:")
         print(*multi_residents, sep="\n")
-    
+
+    # sort again by time
+    data.sort(key=lambda x: x[0])
+
+    error_corrected_event_list_csv = os.path.join(output_folder,"error_corrected_events.csv")
+    if os.path.exists(error_corrected_event_list_csv):
+        os.remove(error_corrected_event_list_csv)
+    with open(error_corrected_event_list_csv, 'a') as f:
+        for line in data:
+            f.write(str(line[0]) + ", " + str(line[1]) + ", " + str(line[2])+ ", " + str(line[3])+ "\n")
     
     address_book_csv = os.path.join(output_folder,"address_book.csv")
     if os.path.exists(address_book_csv):
         os.remove(address_book_csv)
     with open(address_book_csv, 'a') as f:
-        f.write("BEE,NEST\n")
+        f.write("NEST,BEE,EVIDENCE\n")
         for address in address_book:
-            f.write(str(address[0]) + ", " + address[1])
+            f.write(str(address[0]) + ", " + address[1] + ", " + str(address[2]) + "\n")
     
     boozer_book_csv = os.path.join(output_folder,"boozer_book.csv")
     if os.path.exists(boozer_book_csv):
         os.remove(boozer_book_csv)
     with open(boozer_book_csv, 'a') as f:
-        f.write("BEE,HOLES\n")
+        f.write("TIME,BEE,HOLES\n")
         for shamble in boozer_book:
-            f.write(str(shamble[0]) + ", " + str(shamble[1]))
+            f.write(str(shamble[0]) + ", " + str(shamble[1]) + ", " + str(shamble[2])+ "\n")
     
     flight_list_csv = os.path.join(output_folder,"flight_list.csv")
     if os.path.exists(flight_list_csv):
@@ -293,5 +291,12 @@ def extract_agroscope_metrics(csv_file_name, output_folder, min_nest_time=40000,
     with open(flight_list_csv, 'a') as f:
         f.write("TIME,BEE,DURATION\n")
         for flight in flight_book:
-            f.write(str(flight[0]) + ", " + str(flight[1][0]) + ":" + str(flight[1][1]))
+            f.write(str(flight[0]) + ", " + str(flight[1]) + ", " + str(flight[2][0]) + ":" + str(flight[2][1])+ "\n")
+            
+            
+if __name__ == '__main__':
+    csv_file_name = "C:/Users/johan/Desktop/analysis/Test4_4.mp4/all_events.csv"
+    output_folder = "C:/Users/johan/Desktop/analysis/Test4_4.mp4"
+    extract_agroscope_metrics(csv_file_name, output_folder)
+
     
