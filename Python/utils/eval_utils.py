@@ -6,7 +6,6 @@ Created on Fri Aug  9 12:56:20 2019
 """
 
 from utils import file_utils
-from object_detection.utils import label_map_util
 
 
 # Malisiewicz et al.
@@ -108,27 +107,6 @@ def get_index_for_flower(categories, flower_name):
             return flower["id"]
     raise ValueError('flower_name does not exist in categories dict')
 
-
-def get_flower_names_from_labelmap(labelmap_path):
-    """ 
-    Helper function that converts a labelmap dict to a flower_names list
-    
-    Parameters:
-        labelmap_path (str): path to the tensorflow labelmap file
-
-    Returns:
-        tuple: A tuple (flower_names,categories), where flower names is a list of 
-            strings containing all flower names and categories is a list of dicts 
-            in which each dict contains the id and the name of the flower
-    """
-
-    flower_names = []
-    categories = []
-    category_index = label_map_util.create_category_index_from_labelmap(labelmap_path, use_display_name=True)
-    for d in category_index:
-        flower_names.append(category_index[d]["name"])
-        categories.append({"id":category_index[d]["id"], "name":category_index[d]["name"]})
-    return (flower_names,categories)
 
 
 def filter_ground_truth(ground_truths, flower_names):

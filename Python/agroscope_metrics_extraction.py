@@ -186,7 +186,7 @@ def extract_agroscope_metrics(csv_file_name, output_folder, min_nest_time=40000,
             # else:
             #     check_resident(bee_index)
         bee_index += 1
-        if bee_index == len(data) - 2:
+        if bee_index >= len(data) - 1:
             break
     
     
@@ -295,8 +295,8 @@ def extract_agroscope_metrics(csv_file_name, output_folder, min_nest_time=40000,
             
             
 if __name__ == '__main__':
-    csv_file_name = "C:/Users/johan/Desktop/analysis/Test4_4.mp4/all_events.csv"
-    output_folder = "C:/Users/johan/Desktop/analysis/Test4_4.mp4"
+    csv_file_name = "C:/Users/johan/Desktop/all_events_unfiltered.csv"
+    output_folder = "C:/Users/johan/Desktop/test_metrics"
     extract_agroscope_metrics(csv_file_name, output_folder)
 
     
