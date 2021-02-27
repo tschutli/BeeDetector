@@ -66,23 +66,36 @@ def detect_colors(working_dir,frame_queue,labels,progress_callback=None, pause_e
     
         progress_callback("Starting to detect colors: " + working_dir,working_dir)
     
+        processed_images_counter = 1
     
         for index,bee_image_path in enumerate(bee_image_paths):
             
             frame_number = int(re.search('frame(.*)_detection', bee_image_path).group(1))
             detection_number = int(re.search('_detection(.*).png', bee_image_path).group(1))
-                            
-            
+            if pause_event != None and pause_event.is_set():
+                return
+   
             if index % 1000 == 0:
                 progress_callback(index/len(bee_image_paths),working_dir)
+                if pause_event != None and pause_event.is_set():
+                    with open(detected_colors_partial_path, 'wb') as f:
+                        pickle.dump(detected_colors,f)
+                    return
+            
+            if processed_images_counter % 10000 == 0:
+                processed_images_counter += 1
                 with open(detected_colors_partial_path, 'wb') as f:
                     pickle.dump(detected_colors,f)
                 if pause_event != None and pause_event.is_set():
                     return
-                
+
+
             if "color" in detected_colors[frame_number][detection_number]:
                 continue
 
+            if (detected_colors[frame_number] == "Skipped"):
+                continue
+            
             if detected_colors[frame_number][detection_number]["id"] == -1:
                 continue
 
@@ -92,12 +105,10 @@ def detect_colors(working_dir,frame_queue,labels,progress_callback=None, pause_e
             if detected_colors[frame_number][detection_number]["start"] == detected_colors[frame_number][detection_number]["end"]:
                 continue
 
-            
-            
-            image = Image.open(bee_image_path)
+            image = Image.open(open(bee_image_path, 'rb'))
             detections = get_detections_yolo(image,frame_queue,1,labels)
-            
-            
+            processed_images_counter += 1
+
             if len(detections) == 0:
                 detected_colors[frame_number][detection_number]["color"] = None
                 detected_colors[frame_number][detection_number]["color_score"] = 0.0

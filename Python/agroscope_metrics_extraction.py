@@ -36,6 +36,39 @@ def extract_agroscope_metrics(csv_file_name, output_folder, min_nest_time=40000,
     debug_show_error_list = False
     
     
+    # convert a timestamp to milliseconds
+    def timestamp_to_millis(timestamp):
+        hms = timestamp.split(':')
+        return float(hms[0]) * 3.6E6 + float(hms[1]) * 60E3 + float(hms[2]) * 1000
+    
+    def millis_to_timestamp(millis):
+        one_hour_in_millis = 1000*60*60
+        hours = math.floor(millis / one_hour_in_millis)
+        minutes = math.floor((millis % one_hour_in_millis) / 60000)
+        seconds = math.floor((millis % 60000) / 1000 )
+        if hours < 10:
+            hours = "0" + str(hours)
+        if minutes < 10:
+            minutes = "0" + str(minutes)
+        if seconds < 10:
+            seconds = "0" + str(seconds)
+    
+        return str(hours) + ":" + str(minutes) + ":" + str(seconds)
+
+    
+    # convert milliseconds to minutes and seconds
+    def millis_to_min_sec(millis):
+        minutes = math.floor(millis / 60000)
+        if minutes < 10:
+            minutes = "0" + str(minutes)
+    
+        seconds = round((millis % 60000) / 1000)
+        if seconds < 10:
+            seconds = "0" + str(seconds)
+    
+        return [minutes, seconds]
+
+    
     # FUNCTIONS
     
     # correction principle: insert a fitting movement
@@ -53,17 +86,13 @@ def extract_agroscope_metrics(csv_file_name, output_folder, min_nest_time=40000,
         # enter: insert leave
         if "Enter" in data[index][2]:
             # the timestamp of the inserted leave is exactly 1 millisecond after
-            hms = data[index][0].split(':')
-            new_seconds = float(hms[2]) + 0.001
-            new_movement_timestamp = hms[0] + ':' + hms[1] + ':' + seconds_to_string(new_seconds)
+            new_movement_timestamp = millis_to_timestamp(timestamp_to_millis(data[index][0]) + 0.001)
             data.insert(index+1,[new_movement_timestamp, data[index][1], 'Missing Leave', data[index][3]])
 
         # leave: insert enter
         elif 'Leave' in data[index][2]:
             # the timestamp of the inserted enter is exactly 1 millisecond before
-            hms = data[index+1][0].split(':')
-            new_seconds = float(hms[2]) - 0.001
-            new_movement_timestamp = hms[0] + ':' + hms[1] + ':' + seconds_to_string(new_seconds)
+            new_movement_timestamp = millis_to_timestamp(timestamp_to_millis(data[index+1][0]) - 0.001)
             data.insert(index+1,[new_movement_timestamp, data[index][1], 'Missing Enter', data[index+1][3]])
     
         if debug_error_correction:
@@ -74,25 +103,7 @@ def extract_agroscope_metrics(csv_file_name, output_folder, min_nest_time=40000,
             print(data[index + 2])
             print(data[index + 3])
     
-    
-    # convert a timestamp to milliseconds
-    def timestamp_to_millis(timestamp):
-        hms = timestamp.split(':')
-        return float(hms[0]) * 3.6E6 + float(hms[1]) * 60E3 + float(hms[2]) * 1000
-    
-    
-    # convert milliseconds to minutes and seconds
-    def millis_to_min_sec(millis):
-        minutes = math.floor(millis / 60000)
-        if minutes < 10:
-            minutes = "0" + str(minutes)
-    
-        seconds = round((millis % 60000) / 1000)
-        if seconds < 10:
-            seconds = "0" + str(seconds)
-    
-        return [minutes, seconds]
-    
+        
     
     # take measurements of a valid movement qualified as residence
     # drunkenness: number of holes a bee flies to before finding it's nest
