@@ -21,7 +21,7 @@ def extract_agroscope_metrics(csv_file_name, output_folder, min_nest_time=40000,
 
     # VARIABLES
     
-    data = []  # TIME, BEE, ACTION, HOLE
+    data = []  # TIME, BEE, ACTION, HOLE, RESIDENTIAL_MOVEMENT
     multi_nests = []  # nests used by more than one bee
     multi_residents = []  # bees with more than one nest
     errors = []  # list of erroneous movements
@@ -152,6 +152,9 @@ def extract_agroscope_metrics(csv_file_name, output_folder, min_nest_time=40000,
                     if debug_find_residents:
                         print("Found resident: " + str(data[index]))
                     residential_movements.append([data[index][3], data[index][1]])
+                    data[index][4] = data[index][4] + "residential movement " + str(len(residential_movements)) + ", "
+                    data[index+1][4] = data[index+1][4] + "residential movement " + str(len(residential_movements)) + ", "
+                    data[index+2][4] = data[index+2][4] + "residential movement " + str(len(residential_movements)) + ", "
                     take_measurements(index, data[index][3], data[index][1])
                 else:
                     if debug_find_residents:
@@ -168,12 +171,11 @@ def extract_agroscope_metrics(csv_file_name, output_folder, min_nest_time=40000,
         for row in csv_reader:
             # print(f"At {row[0]}, bee {row[1]} did {row[2]} from/to nest {row[3]}.")
             if (row[1] == '?'): continue
-            data.append([row[0], row[1], row[2], row[3]])
+            data.append([row[0], row[1], row[2], row[3], ""])
             # print(data[line_count])
             line_count += 1
         # print(f'Processed {line_count} lines.')
-    
-    
+
     
     # sort by bee
     data.sort(key=lambda x: (x[1],x[0]))
@@ -257,7 +259,7 @@ def extract_agroscope_metrics(csv_file_name, output_folder, min_nest_time=40000,
                 flight_book.remove(flight)
     
     # DATA OUTPUT
-    
+
     if debug_show_error_list:
         print("\nErrors:")
         print(*errors, sep="\n")
@@ -277,22 +279,26 @@ def extract_agroscope_metrics(csv_file_name, output_folder, min_nest_time=40000,
     if os.path.exists(error_corrected_event_list_csv):
         os.remove(error_corrected_event_list_csv)
     with open(error_corrected_event_list_csv, 'a') as f:
+        f.write("TIME,BEE_ID,MOVEMENT,CAVITY_ID,USED")
         for line in data:
-            f.write(str(line[0]) + ", " + str(line[1]) + ", " + str(line[2])+ ", " + str(line[3])+ "\n")
-    
+            if len(line) > 4:
+                f.write(str(line[0]) + ", " + str(line[1]) + ", " + str(line[2])+ ", " + str(line[3])+ ", " + str(line[4]) + "\n")
+            else:
+                f.write(str(line[0]) + ", " + str(line[1]) + ", " + str(line[2])+ ", " + str(line[3]) + "\n")
+   
     address_book_csv = os.path.join(output_folder,"address_book.csv")
     if os.path.exists(address_book_csv):
         os.remove(address_book_csv)
     with open(address_book_csv, 'a') as f:
-        f.write("NEST,BEE,EVIDENCE\n")
+        f.write("BEE_ID,CAVITY_ID,EVIDENCE\n")
         for address in address_book:
-            f.write(str(address[0]) + ", " + address[1] + ", " + str(address[2]) + "\n")
+            f.write(str(address[1]) + ", " + str(address[0]) + ", " + str(address[2]) + "\n")
     
-    boozer_book_csv = os.path.join(output_folder,"boozer_book.csv")
+    boozer_book_csv = os.path.join(output_folder,"nest_recognition.csv")
     if os.path.exists(boozer_book_csv):
         os.remove(boozer_book_csv)
     with open(boozer_book_csv, 'a') as f:
-        f.write("TIME,BEE,HOLES\n")
+        f.write("TIME,BEE_ID,CAVITIES\n")
         for shamble in boozer_book:
             f.write(str(shamble[0]) + ", " + str(shamble[1]) + ", " + str(shamble[2])+ "\n")
     
@@ -300,14 +306,18 @@ def extract_agroscope_metrics(csv_file_name, output_folder, min_nest_time=40000,
     if os.path.exists(flight_list_csv):
         os.remove(flight_list_csv)
     with open(flight_list_csv, 'a') as f:
-        f.write("TIME,BEE,DURATION\n")
+        f.write("TIME,BEE_ID,DURATION\n")
         for flight in flight_book:
             f.write(str(flight[0]) + ", " + str(flight[1]) + ", " + str(flight[2][0]) + ":" + str(flight[2][1])+ "\n")
             
-            
 if __name__ == '__main__':
-    csv_file_name = "C:/Users/johan/Desktop/all_events_unfiltered.csv"
-    output_folder = "C:/Users/johan/Desktop/test_metrics"
-    extract_agroscope_metrics(csv_file_name, output_folder)
+    for file in os.listdir("/Users/ubique/Downloads/csvFiles"):
+        if "unfiltered" in file:
+            csv_file_name = "/Users/ubique/Downloads/csvFiles/" + file
+            output_folder = "/Users/ubique/Downloads/csvFiles"
+            extract_agroscope_metrics(csv_file_name, output_folder)
+            print(csv_file_name[-10:])
+            os.rename("/Users/ubique/Downloads/csvFiles/error_corrected_events.csv","/Users/ubique/Downloads/csvFiles/error_corrected_events" + csv_file_name[-10:])
+
 
     
