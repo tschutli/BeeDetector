@@ -279,25 +279,26 @@ def extract_agroscope_metrics(csv_file_name, output_folder, min_nest_time=40000,
     if os.path.exists(error_corrected_event_list_csv):
         os.remove(error_corrected_event_list_csv)
     with open(error_corrected_event_list_csv, 'a') as f:
+        f.write("TIME,BEE_ID,MOVEMENT,CAVITY_ID,USED")
         for line in data:
             if len(line) > 4:
                 f.write(str(line[0]) + ", " + str(line[1]) + ", " + str(line[2])+ ", " + str(line[3])+ ", " + str(line[4]) + "\n")
             else:
                 f.write(str(line[0]) + ", " + str(line[1]) + ", " + str(line[2])+ ", " + str(line[3]) + "\n")
-    ''' 
+   
     address_book_csv = os.path.join(output_folder,"address_book.csv")
     if os.path.exists(address_book_csv):
         os.remove(address_book_csv)
     with open(address_book_csv, 'a') as f:
-        f.write("NEST,BEE,EVIDENCE\n")
+        f.write("BEE_ID,CAVITY_ID,EVIDENCE\n")
         for address in address_book:
-            f.write(str(address[0]) + ", " + address[1] + ", " + str(address[2]) + "\n")
+            f.write(str(address[1]) + ", " + str(address[0]) + ", " + str(address[2]) + "\n")
     
-    boozer_book_csv = os.path.join(output_folder,"boozer_book.csv")
+    boozer_book_csv = os.path.join(output_folder,"nest_recognition.csv")
     if os.path.exists(boozer_book_csv):
         os.remove(boozer_book_csv)
     with open(boozer_book_csv, 'a') as f:
-        f.write("TIME,BEE,HOLES\n")
+        f.write("TIME,BEE_ID,CAVITIES\n")
         for shamble in boozer_book:
             f.write(str(shamble[0]) + ", " + str(shamble[1]) + ", " + str(shamble[2])+ "\n")
     
@@ -305,10 +306,9 @@ def extract_agroscope_metrics(csv_file_name, output_folder, min_nest_time=40000,
     if os.path.exists(flight_list_csv):
         os.remove(flight_list_csv)
     with open(flight_list_csv, 'a') as f:
-        f.write("TIME,BEE,DURATION\n")
+        f.write("TIME,BEE_ID,DURATION\n")
         for flight in flight_book:
             f.write(str(flight[0]) + ", " + str(flight[1]) + ", " + str(flight[2][0]) + ":" + str(flight[2][1])+ "\n")
-    '''
             
 if __name__ == '__main__':
     for file in os.listdir("/Users/ubique/Downloads/csvFiles"):
