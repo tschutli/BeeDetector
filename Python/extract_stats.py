@@ -59,7 +59,7 @@ def write_starts_and_ends_to_file(detection_map,all_events_unfiltered_csv_file):
     
     
     with open(all_events_unfiltered_csv_file, 'a') as f:
-        f.write("TIME,BEE,ACTION,HOLE\n")
+        f.write("TIME,BEE_ID,MOVEMENT,CAVITY_ID\n")
         fps = 25
         
         frame_number = 0

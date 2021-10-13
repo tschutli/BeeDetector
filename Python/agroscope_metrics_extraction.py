@@ -279,7 +279,7 @@ def extract_agroscope_metrics(csv_file_name, output_folder, min_nest_time=40000,
     if os.path.exists(error_corrected_event_list_csv):
         os.remove(error_corrected_event_list_csv)
     with open(error_corrected_event_list_csv, 'a') as f:
-        f.write("TIME,BEE_ID,MOVEMENT,CAVITY_ID,USED")
+        f.write("TIME,BEE_ID,MOVEMENT,CAVITY_ID,USED\n")
         for line in data:
             if len(line) > 4:
                 f.write(str(line[0]) + ", " + str(line[1]) + ", " + str(line[2])+ ", " + str(line[3])+ ", " + str(line[4]) + "\n")
