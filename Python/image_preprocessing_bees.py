@@ -640,26 +640,11 @@ def download_pretrained_model(project_folder, link):
 if __name__== "__main__":
     
     
-    input_folders = [".../Data/video2/bees",
-                     ".../Data/video5/bees",
-                     ".../Data/video4/bees0",
-                     ".../Data/video4/bees4",
-                     ".../Data/video1/bees",
-                     ".../Data/video3/bees"]
+    input_folders = [".../video1/bees"]
     
-    test_splits = [0.0,
-                   0.0,
-                   0.0,
-                   0.0,
-                   0.0,
-                   0.0]
+    test_splits = [0.0]
     
-    validation_splits = [0.1,
-                         0.1,
-                         0.1,
-                         0.1,
-                         0.1,
-                         0.1]
+    validation_splits = [0.1]
 
     #All outputs will be saved into this folder
     project_folder = "path/to/empty/folder"
