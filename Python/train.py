@@ -210,6 +210,6 @@ def run(project_dir,max_steps):
     #tf.app.run(main)
 
 if __name__ == '__main__':
-    project_dir = "../output"
+    project_dir = "../output1"
 
     run(project_dir,130000)
