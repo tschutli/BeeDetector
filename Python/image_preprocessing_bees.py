@@ -640,14 +640,14 @@ def download_pretrained_model(project_folder, link):
 if __name__== "__main__":
     
     
-    input_folders = [".../video1/bees"]
+    input_folders = ["../../video1/bees"]
     
     test_splits = [0.0]
     
     validation_splits = [0.1]
 
     #All outputs will be saved into this folder
-    project_folder = "path/to/empty/folder"
+    project_folder = "../output"
     
     tensorflow_tile_size = (1024,576)
     
