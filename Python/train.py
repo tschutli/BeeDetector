@@ -20,6 +20,7 @@ This script trains a model.
 
 
 print("Loading libraries...")
+sys.path.append("../../tensorflow/models/research")
 import functools
 import json
 import os
