@@ -640,7 +640,7 @@ def download_pretrained_model(project_folder, link):
 if __name__== "__main__":
     
     
-    input_folders = ["../../video14/bees"]
+    input_folders = ["../../falter-images"]
     
     test_splits = [0.0]
     
