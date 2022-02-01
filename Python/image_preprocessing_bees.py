@@ -160,7 +160,7 @@ def convert_annotation_folders(input_folders, test_splits, validation_splits, pr
 
 
 
-    rotate_images_and_annotations(train_images_dir)
+    rotate_images_and_annotations(train_images_dir, labels)
 
     print("Creating Labelmap file...")
     annotations_dir = os.path.join(project_dir, "model_inputs")
@@ -200,7 +200,7 @@ def convert_annotation_folders(input_folders, test_splits, validation_splits, pr
     print("Done!")
 
 
-def rotate_images_and_annotations(train_images_dir):
+def rotate_images_and_annotations(train_images_dir, labels):
 
     image_paths = file_utils.get_all_image_paths_in_folder(train_images_dir)
     # random.shuffle(image_paths)
@@ -214,6 +214,7 @@ def rotate_images_and_annotations(train_images_dir):
         image_path = image_paths[i]
         annotations = file_utils.get_annotations_from_xml(image_path[:-4] + ".xml")
         for rot_angle in rot_angles:
+            filter_annotations(annotations, labels)
             dest_image_path = os.path.join(train_images_dir, "rot" + str(rot_angle) + "_" + os.path.basename(image_path))
 
             image = Image.open(image_path)
