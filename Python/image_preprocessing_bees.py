@@ -649,7 +649,7 @@ if __name__== "__main__":
     #All outputs will be saved into this folder
     project_folder = "../output1"
     
-    tensorflow_tile_size = (1024,576)
+    tensorflow_tile_size = (1240,877)
     
     
         
