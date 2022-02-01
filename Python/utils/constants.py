@@ -38,7 +38,7 @@ validation_splits = [0.1,
 #All images will be resized to tensorflow_tile_size x tensorflow_tile_size tiles
 #choose a smaller tensorflow_tile_size if your gpu is not powerful enough to handle
 #900 x 900 pixel tiles
-tensorflow_tile_size = (1043,742)
+tensorflow_tile_size = (877,627)
 #tensorflow_tile_size = None
 
 

@@ -803,7 +803,7 @@ if __name__== "__main__":
     #All outputs will be saved into this folder
     project_folder = "../output1"
     
-    tensorflow_tile_size = (1043,742)
+    tensorflow_tile_size = (877,627)
     
 
     convert_annotation_folders(input_folders, test_splits,validation_splits, project_folder, tensorflow_tile_size=tensorflow_tile_size, overlap = 50)
