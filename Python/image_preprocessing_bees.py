@@ -41,12 +41,13 @@ import tarfile
 import shutil
 from object_detection.protos import preprocessor_pb2
 import pickle
+import numpy as np
 
 
 
 
 
-def convert_annotation_folders(input_folders, test_splits, validation_splits, project_dir, model_link=constants.pretrained_model_link,tensorflow_tile_size = constants.tensorflow_tile_size):
+def convert_annotation_folders(input_folders, test_splits, validation_splits, project_dir, model_link=constants.pretrained_model_link,tensorflow_tile_size = constants.tensorflow_tile_size, overlap=0):
     
     """Converts the contents of a list of input folders into tensorflow readable format ready for training
 
@@ -88,6 +89,7 @@ def convert_annotation_folders(input_folders, test_splits, validation_splits, pr
     test_images_dir = os.path.join(os.path.join(project_dir, "images"),"test")
     validation_images_dir = os.path.join(os.path.join(project_dir, "images"),"validation")
 
+    """
     for input_folder_index in range(0,len(input_folders)):
         
         input_folder = input_folders[input_folder_index]
@@ -141,11 +143,25 @@ def convert_annotation_folders(input_folders, test_splits, validation_splits, pr
 
                 dest_annotations_xml = build_xml_tree(annotations,dest_image_path)
                 dest_annotations_xml.write(dest_xml_path)
+    """
+    for input_folder_index in range(0, len(input_folders)):
 
-    
-    
-    
-            
+        input_folder = input_folders[input_folder_index]
+
+        image_paths = file_utils.get_all_image_paths_in_folder(input_folder)
+
+        print("")
+        print("Tiling images (and annotations) into chunks suitable for Tensorflow training: (" + input_folder + ")")
+        sys.stdout.flush()
+        for i in progressbar.progressbar(range(len(image_paths))):
+            image_path = image_paths[i]
+
+            tile_image_and_annotations(image_path, train_images_dir, labels, input_folder_index, tensorflow_tile_size, overlap)
+
+
+
+    rotate_images_and_annotations(train_images_dir)
+
     print("Creating Labelmap file...")
     annotations_dir = os.path.join(project_dir, "model_inputs")
     write_labels_to_labelmapfile(labels,annotations_dir)
@@ -182,6 +198,91 @@ def convert_annotation_folders(input_folders, test_splits, validation_splits, pr
 
     print(str(len(labels)) + " classes used for training.")
     print("Done!")
+
+
+def rotate_images_and_annotations(train_images_dir):
+
+    image_paths = file_utils.get_all_image_paths_in_folder(train_images_dir)
+    # random.shuffle(image_paths)
+
+    print("")
+    print("Rotating images...")
+    sys.stdout.flush()
+    rot_angles = [180]
+
+    for i in progressbar.progressbar(range(len(image_paths))):
+        image_path = image_paths[i]
+        annotations = file_utils.get_annotations_from_xml(image_path[:-4] + ".xml")
+        for rot_angle in rot_angles:
+            dest_image_path = os.path.join(train_images_dir, "rot" + str(rot_angle) + "_" + os.path.basename(image_path))
+
+            image = Image.open(image_path)
+            rotate_annotations(rot_angle, annotations, image)
+            image = image.rotate(rot_angle, expand=True)
+            image.save(dest_image_path)
+
+            dest_xml_path = dest_image_path[:-4] + ".xml"
+
+            dest_annotations_xml = build_xml_tree(annotations, dest_image_path)
+            dest_annotations_xml.write(dest_xml_path)
+
+
+def tile_image_and_annotations(image_path, output_folder, labels, input_folder_index, tile_size, overlap):
+    """Tiles the image and the annotations into square shaped tiles of size tile_size
+        Requires the image to have either a tablet annotation file (imagename_annotations.json)
+        or the LabelMe annotation file (imagename.json) stored in the same folder
+    Parameters:
+        image_path (str): The image path
+        output_folder (string): Path of the output directory
+        labels (dict): a dict inside of which the flowers are counted
+        input_folder_index (int): the index of the input folder
+        tile_size (int, int): the tile size
+        overlap (int): overlap in pixels to use during the image tiling process
+
+    Returns:
+        Fills the output_folder with all tiles (and annotation files in xml format)
+        that contain any flowers.
+    """
+
+    # image = Image.open(image_path)
+    image_array = file_utils.get_image_array(image_path)
+    height = image_array.shape[0]
+    width = image_array.shape[1]
+    image_name = os.path.basename(image_path)
+    counter = 0
+    currentx = 0
+    currenty = 0
+    (x, y) = tile_size
+    while currenty < height:
+        while currentx < width:
+            filtered_annotations = get_annotations_within_bounds(image_path, currentx, currenty, tile_size)
+            if len(filtered_annotations) == 0:
+                # Ignore image tiles without any annotations
+                currentx += x - overlap
+                continue
+
+            # crop the image using gdal
+            cropped_array = image_array[currenty:currenty + y, currentx:currentx + x, :]
+
+            pad_end_x = x - cropped_array.shape[1]
+            pad_end_y = y - cropped_array.shape[0]
+            cropped_array = np.pad(cropped_array, ((0, pad_end_y), (0, pad_end_x), (0, 0)), mode='constant',
+                                   constant_values=0)
+            tile = Image.fromarray(cropped_array)
+            # tile = image.crop((currentx,currenty,currentx + tile_size,currenty + tile_size))
+            output_image_path = os.path.join(output_folder,
+                                             image_name + "_subtile_" + "x" + str(currentx) + "y" + str(
+                                                 currenty) + "_inputdir" + str(input_folder_index) + ".png")
+            tile.save(output_image_path, "PNG")
+
+            xml_path = output_image_path[:-4] + ".xml"
+            annotations_xml = build_xml_tree(filtered_annotations, output_image_path)
+            annotations_xml.write(xml_path)
+
+            currentx += x - overlap
+        currenty += y - overlap
+        currentx = 0
+        counter = counter + 1
 
    
 def rotate_annotations(rot_angle, annotations, image):
@@ -222,8 +323,60 @@ def resize_image(image_path,dest_image_path,annotations,size=None):
     image.save(dest_image_path)
 
     
+def get_annotations_within_bounds(image_path, x_offset, y_offset, tile_size):
+    """
+    Returns a list of all annotations that are located within the specified bounds of the image
+    Parameters:
+        image_path (str): path of the image file
+        x_offset (int): the left bound of the tile to search in
+        y_offset (int): the top bound of the tile to search in
+        tile_size (int,int): the tile size
 
-    
+    Returns:
+        list: a list of dicts containing all annotations within the specified bounds
+    """
+
+    filtered_annotations = []
+    annotations = file_utils.get_annotations(image_path)
+    (x,y) = tile_size
+
+    for annotation in annotations:
+
+        [top, left, bottom, right] = annotation["bounding_box"]
+        [top, left, bottom, right] = [top - y_offset, left - x_offset, bottom - y_offset, right - x_offset]
+        if is_bounding_box_within_image(tile_size, top, left, bottom, right):
+            annotation["bounding_box"] = [max(-1, top), max(-1, left), min(y + 1, bottom),
+                                      min(x + 1, right)]
+            filtered_annotations.append(annotation)
+    return filtered_annotations
+
+
+def is_bounding_box_within_image(tile_size, top, left, bottom, right):
+    """Checks if a specified bounding box intersects with the image tile
+    Parameters:
+        tile_size (int): the tile size
+        top (int): top bound of bounding box
+        left (int): left bound of bounding box
+        bottom (int): bottom bound of bounding box
+        right (int): right bound of bounding box
+
+    Returns:
+        bool: True if the specified bounding box is within the image bounds,
+            False otherwise
+    """
+
+    (x,y) = tile_size
+
+    if left < 0 and right < 0:
+        return False
+    if left >= x and right >= x:
+        return False
+    if bottom < 0 and top < 0:
+        return False
+    if bottom >= y and top >= y:
+        return False
+    return True
+
 
 def filter_annotations(annotations,labels):
     for annotation in annotations:
@@ -649,9 +802,8 @@ if __name__== "__main__":
     #All outputs will be saved into this folder
     project_folder = "../output1"
     
-    tensorflow_tile_size = (1240,877)
+    tensorflow_tile_size = (1043,742)
     
-    
-        
-    convert_annotation_folders(input_folders, test_splits,validation_splits, project_folder, tensorflow_tile_size=tensorflow_tile_size)
+
+    convert_annotation_folders(input_folders, test_splits,validation_splits, project_folder, tensorflow_tile_size=tensorflow_tile_size, overlap = 50)
 
