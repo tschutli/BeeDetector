@@ -255,7 +255,7 @@ if __name__ == '__main__':
     
     project_dir = "../output1"
 
-    images_to_predict = "../output1"
+    images_to_predict = "../../../ubique/prediction-images"
     
     output_folder = "../output1/predictions"
     
