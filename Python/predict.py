@@ -20,6 +20,7 @@ import numpy as np
 import sys
 import tensorflow as tf
 from object_detection.utils import visualization_utils
+import progressbar
 
 
 from distutils.version import StrictVersion
