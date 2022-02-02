@@ -32,7 +32,7 @@ if StrictVersion(tf.__version__) < StrictVersion('1.9.0'):
 from object_detection.utils import label_map_util
 
 
-def predict(project_dir,images_to_predict,output_folder,tile_size,min_confidence_score=0.5,visualize_predictions=True,visualize_groundtruths=False, visualize_scores=False, visualize_names=False, max_iou=0.3):
+def predict(project_dir,images_to_predict,output_folder,tile_size,prediction_overlap,min_confidence_score=0.5,visualize_predictions=True,visualize_groundtruths=False, visualize_scores=False, visualize_names=True, max_iou=0.3):
   """
   Makes predictions on all images in the images_to_predict folder and saves them to the
   output_folder with the prediction bounding boxes drawn onto the images. Additionally
@@ -75,62 +75,76 @@ def predict(project_dir,images_to_predict,output_folder,tile_size,min_confidence
     tensor_dict = get_tensor_dict()
     image_tensor = tf.get_default_graph().get_tensor_by_name('image_tensor:0') 
     all_images = file_utils.get_all_image_paths_in_folder(images_to_predict)
-    
+
+    (tile_size_x, tile_size_y) = tile_size
+
     for image_path in all_images:
         
         image = Image.open(image_path)
-        original_width, original_height = image.size
+        width, height = image.size
 
         print("Making Predictions for " + os.path.basename(image_path) + "...")
-        
+
         detections = []
-        
-        if tile_size != None:
-            image = image.resize(tile_size, Image.ANTIALIAS)
-        
-        #image_np = load_image_into_numpy_array(image)
-        image_np = np.asarray(image)         
-        image_expand = np.expand_dims(image_np, 0)
+        # create appropriate tiles from image
+        for x_start in progressbar.progressbar(
+                range(-prediction_overlap, width - 1, tile_size_x - 2 * prediction_overlap)):
+            for y_start in range(-prediction_overlap, height - 1, tile_size_y - 2 * prediction_overlap):
 
-        output_dict = sess.run(tensor_dict,feed_dict={image_tensor: image_expand})
-        
-        output_dict = clean_output_dict(output_dict)
-        
+                crop_rectangle = (x_start, y_start, x_start + tile_size_x, y_start + tile_size_y)
+                cropped_im = image.crop(crop_rectangle)
 
-        count = 0
-        for i,score in enumerate(output_dict['detection_scores']):
-            if score >= min_confidence_score:
-                count += 1
-                top = round(output_dict['detection_boxes'][i][0] * original_height)
-                left = round(output_dict['detection_boxes'][i][1] * original_width)
-                bottom = round(output_dict['detection_boxes'][i][2] * original_height)
-                right = round(output_dict['detection_boxes'][i][3] * original_width)
-                detection_class = output_dict['detection_classes'][i]
-                detections.append({"bounding_box": [top,left,bottom,right], "score": float(score), "name": category_index[detection_class]["name"]})
-                        
-        #detections = eval_utils.non_max_suppression(detections,max_iou)
-        
+                cropped_im = cropped_im.convert("RGB")
+
+                image_np = np.asarray(cropped_im)
+                image_expand = np.expand_dims(image_np, 0)
+
+                output_dict = sess.run(tensor_dict, feed_dict={image_tensor: image_expand})
+                output_dict = clean_output_dict(output_dict)
+
+                core_overlap = int(prediction_overlap * 0.2)
+                count = 0
+                for i, score in enumerate(output_dict['detection_scores']):
+                    center_x = (output_dict['detection_boxes'][i][3] + output_dict['detection_boxes'][i][
+                        1]) / 2 * tile_size_x
+                    center_y = (output_dict['detection_boxes'][i][2] + output_dict['detection_boxes'][i][
+                        0]) / 2 * tile_size_y
+                    if score >= min_confidence_score and center_x >= prediction_overlap - core_overlap and center_y >= prediction_overlap - core_overlap and center_x < tile_size_x - prediction_overlap + core_overlap and center_y < tile_size_y - prediction_overlap + core_overlap:
+                        count += 1
+                        top = round(output_dict['detection_boxes'][i][0] * tile_size_y + y_start)
+                        left = round(output_dict['detection_boxes'][i][1] * tile_size_x + x_start)
+                        bottom = round(output_dict['detection_boxes'][i][2] * tile_size_y + y_start)
+                        right = round(output_dict['detection_boxes'][i][3] * tile_size_x + x_start)
+                        detection_class = output_dict['detection_classes'][i]
+                        detections.append({"bounding_box": [top, left, bottom, right], "score": float(score), "name": category_index[detection_class]["name"]})
+
+        detections = eval_utils.non_max_suppression(detections, max_iou)
+
         print(str(len(detections)) + " objects detected")
-        
         predictions_out_path = os.path.join(output_folder, os.path.basename(image_path)[:-4] + ".xml")
         file_utils.save_annotations_to_xml(detections, image_path, predictions_out_path)
+        # file_utils.save_json_file(detections,predictions_out_path)
 
-        #copy the ground truth annotations to the output folder if there is any ground truth
+        # copy the ground truth annotations to the output folder if there is any ground truth
         ground_truth = get_ground_truth_annotations(image_path)
         if ground_truth:
-            #draw ground truth
+            # draw ground truth
             if visualize_groundtruths:
                 for detection in ground_truth:
-                    [top,left,bottom,right] = detection["bounding_box"]
+                    [top, left, bottom, right] = detection["bounding_box"]
                     col = "black"
-                    visualization_utils.draw_bounding_box_on_image(image,top,left,bottom,right,display_str_list=(),thickness=1, color=col, use_normalized_coordinates=False)          
+                    visualization_utils.draw_bounding_box_on_image(image, top, left, bottom, right,
+                                                                   display_str_list=(), thickness=1, color=col,
+                                                                   use_normalized_coordinates=False)
 
             ground_truth_out_path = os.path.join(output_folder, os.path.basename(image_path)[:-4] + "_ground_truth.xml")
             file_utils.save_annotations_to_xml(ground_truth, image_path, ground_truth_out_path)
-        
+
+            # file_utils.save_json_file(ground_truth,ground_truth_out_path)
 
         for detection in detections:
             if visualize_predictions:
+                #TODO: Use a color per class here
                 col = 'LightCyan'
                 [top,left,bottom,right] = detection["bounding_box"]
                 score_string = str('{0:.2f}'.format(detection["score"]))
@@ -138,14 +152,13 @@ def predict(project_dir,images_to_predict,output_folder,tile_size,min_confidence
                 if visualize_scores:
                     vis_string_list.append(score_string)
                 if visualize_names:
-                    vis_string_list.append(detection["name"])                            
-                visualization_utils.draw_bounding_box_on_image(image,top,left,bottom,right,display_str_list=vis_string_list,thickness=1, color=col, use_normalized_coordinates=False)          
-        
+                    vis_string_list.append(detection["name"])
+                visualization_utils.draw_bounding_box_on_image(image,top,left,bottom,right,display_str_list=vis_string_list,thickness=1, color=col, use_normalized_coordinates=False)
+
+
         if visualize_groundtruths or visualize_predictions:
             image_output_path = os.path.join(output_folder, os.path.basename(image_path))
             image.save(image_output_path)
-
-
 
         
 def get_ground_truth_annotations(image_path):
@@ -240,18 +253,18 @@ def get_tensor_dict():
 
 if __name__ == '__main__':
     
-    project_dir = constants.project_folder
+    project_dir = "../output1"
 
-    images_to_predict = project_dir + "/images/test"
+    images_to_predict = "../output1"
     
-    output_folder = constants.predictions_folder
+    output_folder = "../output1/predictions"
     
     
     #size of tiles to feed into prediction network
-    tile_size = constants.tensorflow_tile_size
+    tile_size =  (877,627)
     #minimum distance from edge of tile for prediction to be considered
-    prediction_overlap = constants.prediction_overlap
+    prediction_overlap = 50
 
-    predict(project_dir,images_to_predict,output_folder,tile_size)
+    predict(project_dir,images_to_predict,output_folder,tile_size, prediction_overlap)
 
     
