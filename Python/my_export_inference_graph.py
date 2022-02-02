@@ -147,8 +147,7 @@ def run(project_dir,look_in_checkpoints_dir = True, model_selection_criterion="f
     pipeline_config_path = train_dir + "/pre-trained-model/pipeline.config"
     training_directory = os.path.join(project_dir,"training")
     if checkpoint:
-        checkpoints_dir = os.path.join(training_directory,"checkpoints")
-        trained_checkpoint_prefix = os.path.join(checkpoints_dir,"model.ckpt-" + str(checkpoint))
+        trained_checkpoint_prefix = os.path.join(training_directory,"model.ckpt-" + str(checkpoint))
         
     else:
         trained_checkpoint_prefix = find_best_model(training_directory,look_in_checkpoints_dir,model_selection_criterion)
