@@ -100,8 +100,6 @@ def main(train_dir,pipeline_config_path):
 
   env = json.loads(os.environ.get('TF_CONFIG', '{}'))
   cluster_data = env.get('cluster', None)
-  print("&&&&&&& cluster data")
-  print(cluster_data)
   cluster = tf.train.ClusterSpec(cluster_data) if cluster_data else None
   task_data = env.get('task', None) or {'type': 'master', 'index': 0}
   task_info = type('TaskSpec', (object,), task_data)
@@ -141,6 +139,9 @@ def main(train_dir,pipeline_config_path):
   if 'graph_rewriter_config' in configs:
     graph_rewriter_fn = graph_rewriter_builder.build(
         configs['graph_rewriter_config'], is_training=True)
+
+  print("&&&&&&&&&&&&&&&&&&&&&&&&& train config")
+  print(train_config)
 
   trainer.train(
       create_input_dict_fn,
