@@ -63,7 +63,9 @@ def main(train_dir,pipeline_config_path):
   input_config_path = ''
   num_clones = 1
   clone_on_cpu = False
-  
+  tf.config.threading.set_intra_op_parallelism_threads(16)
+  tf.config.threading.set_inter_op_parallelism_threads(16)
+
   if task == 0: tf.gfile.MakeDirs(train_dir)
   if pipeline_config_path:
     configs = config_util.get_configs_from_pipeline_file(pipeline_config_path)
