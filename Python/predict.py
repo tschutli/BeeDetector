@@ -259,7 +259,7 @@ if __name__ == '__main__':
 
     images_to_predict = "../../../ubique/prediction-images"
     
-    output_folder = "../output1/predictions"
+    output_folder = "../../../ubique/predictions"
     
     
     #size of tiles to feed into prediction network
