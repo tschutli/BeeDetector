@@ -72,95 +72,103 @@ def predict(project_dir,images_to_predict,output_folder,tile_size,prediction_ove
 
   with detection_graph.as_default():
    with tf.Session() as sess:
-       
-       
-    tensor_dict = get_tensor_dict()
-    image_tensor = tf.get_default_graph().get_tensor_by_name('image_tensor:0') 
-    all_images = file_utils.get_all_image_paths_in_folder(images_to_predict)
 
-    (tile_size_x, tile_size_y) = tile_size
+    with open(output_folder + "/results.txt","w") as resultFile:
+        resultFile.write("filename,tuta,para,fly,unknown")
+    
+        tensor_dict = get_tensor_dict()
+        image_tensor = tf.get_default_graph().get_tensor_by_name('image_tensor:0')
+        all_images = file_utils.get_all_image_paths_in_folder(images_to_predict)
 
-    for image_path in all_images:
-        
-        image = Image.open(image_path)
-        width, height = image.size
+        (tile_size_x, tile_size_y) = tile_size
 
-        print("Making Predictions for " + os.path.basename(image_path) + "...")
+        for image_path in all_images:
 
-        detections = []
-        # create appropriate tiles from image
-        for x_start in progressbar.progressbar(
-                range(-prediction_overlap, width - 1, tile_size_x - 2 * prediction_overlap)):
-            for y_start in range(-prediction_overlap, height - 1, tile_size_y - 2 * prediction_overlap):
+            image = Image.open(image_path)
+            width, height = image.size
 
-                crop_rectangle = (x_start, y_start, x_start + tile_size_x, y_start + tile_size_y)
-                cropped_im = image.crop(crop_rectangle)
+            print("Making Predictions for " + os.path.basename(image_path) + "...")
 
-                cropped_im = cropped_im.convert("RGB")
+            detections = []
+            # create appropriate tiles from image
+            for x_start in progressbar.progressbar(
+                    range(-prediction_overlap, width - 1, tile_size_x - 2 * prediction_overlap)):
+                for y_start in range(-prediction_overlap, height - 1, tile_size_y - 2 * prediction_overlap):
 
-                image_np = np.asarray(cropped_im)
-                image_expand = np.expand_dims(image_np, 0)
+                    crop_rectangle = (x_start, y_start, x_start + tile_size_x, y_start + tile_size_y)
+                    cropped_im = image.crop(crop_rectangle)
 
-                output_dict = sess.run(tensor_dict, feed_dict={image_tensor: image_expand})
-                output_dict = clean_output_dict(output_dict)
+                    cropped_im = cropped_im.convert("RGB")
 
-                core_overlap = int(prediction_overlap * 0.2)
-                count = 0
-                for i, score in enumerate(output_dict['detection_scores']):
-                    center_x = (output_dict['detection_boxes'][i][3] + output_dict['detection_boxes'][i][
-                        1]) / 2 * tile_size_x
-                    center_y = (output_dict['detection_boxes'][i][2] + output_dict['detection_boxes'][i][
-                        0]) / 2 * tile_size_y
-                    if score >= min_confidence_score and center_x >= prediction_overlap - core_overlap and center_y >= prediction_overlap - core_overlap and center_x < tile_size_x - prediction_overlap + core_overlap and center_y < tile_size_y - prediction_overlap + core_overlap:
-                        count += 1
-                        top = round(output_dict['detection_boxes'][i][0] * tile_size_y + y_start)
-                        left = round(output_dict['detection_boxes'][i][1] * tile_size_x + x_start)
-                        bottom = round(output_dict['detection_boxes'][i][2] * tile_size_y + y_start)
-                        right = round(output_dict['detection_boxes'][i][3] * tile_size_x + x_start)
-                        detection_class = output_dict['detection_classes'][i]
-                        detections.append({"bounding_box": [top, left, bottom, right], "score": float(score), "name": category_index[detection_class]["name"]})
+                    image_np = np.asarray(cropped_im)
+                    image_expand = np.expand_dims(image_np, 0)
 
-        detections = eval_utils.non_max_suppression(detections, max_iou)
+                    output_dict = sess.run(tensor_dict, feed_dict={image_tensor: image_expand})
+                    output_dict = clean_output_dict(output_dict)
 
-        print(str(len(detections)) + " objects detected")
-        predictions_out_path = os.path.join(output_folder, os.path.basename(image_path)[:-4] + ".xml")
-        file_utils.save_annotations_to_xml(detections, image_path, predictions_out_path)
-        # file_utils.save_json_file(detections,predictions_out_path)
+                    core_overlap = int(prediction_overlap * 0.2)
+                    count = 0
+                    for i, score in enumerate(output_dict['detection_scores']):
+                        center_x = (output_dict['detection_boxes'][i][3] + output_dict['detection_boxes'][i][
+                            1]) / 2 * tile_size_x
+                        center_y = (output_dict['detection_boxes'][i][2] + output_dict['detection_boxes'][i][
+                            0]) / 2 * tile_size_y
+                        if score >= min_confidence_score and center_x >= prediction_overlap - core_overlap and center_y >= prediction_overlap - core_overlap and center_x < tile_size_x - prediction_overlap + core_overlap and center_y < tile_size_y - prediction_overlap + core_overlap:
+                            count += 1
+                            top = round(output_dict['detection_boxes'][i][0] * tile_size_y + y_start)
+                            left = round(output_dict['detection_boxes'][i][1] * tile_size_x + x_start)
+                            bottom = round(output_dict['detection_boxes'][i][2] * tile_size_y + y_start)
+                            right = round(output_dict['detection_boxes'][i][3] * tile_size_x + x_start)
+                            detection_class = output_dict['detection_classes'][i]
+                            detections.append({"bounding_box": [top, left, bottom, right], "score": float(score), "name": category_index[detection_class]["name"]})
 
-        # copy the ground truth annotations to the output folder if there is any ground truth
-        ground_truth = get_ground_truth_annotations(image_path)
-        if ground_truth:
-            # draw ground truth
-            if visualize_groundtruths:
-                for detection in ground_truth:
-                    [top, left, bottom, right] = detection["bounding_box"]
-                    col = "black"
-                    visualization_utils.draw_bounding_box_on_image(image, top, left, bottom, right,
-                                                                   display_str_list=(), thickness=1, color=col,
-                                                                   use_normalized_coordinates=False)
+            detections = eval_utils.non_max_suppression(detections, max_iou)
 
-            ground_truth_out_path = os.path.join(output_folder, os.path.basename(image_path)[:-4] + "_ground_truth.xml")
-            file_utils.save_annotations_to_xml(ground_truth, image_path, ground_truth_out_path)
+            print(str(len(detections)) + " objects detected")
+            numTuta = sum(1 for detection in detections if detection["name"] == "tuta")
+            numPara = sum(1 for detection in detections if detection["name"] == "para")
+            numFly = sum(1 for detection in detections if detection["name"] == "fly")
+            numUnknown = sum(1 for detection in detections if detection["name"] == "unknown")
 
-            # file_utils.save_json_file(ground_truth,ground_truth_out_path)
+            resultFile.write(os.path.basename(image_path) +","+str(numTuta)+","+str(numPara)+","+str(numFly)+","+str(numUnknown))
+            predictions_out_path = os.path.join(output_folder, os.path.basename(image_path)[:-4] + ".xml")
+            file_utils.save_annotations_to_xml(detections, image_path, predictions_out_path)
+            # file_utils.save_json_file(detections,predictions_out_path)
 
-        for detection in detections:
-            if visualize_predictions:
-                #TODO: Use a color per class here
-                col = 'LightCyan'
-                [top,left,bottom,right] = detection["bounding_box"]
-                score_string = str('{0:.2f}'.format(detection["score"]))
-                vis_string_list = []
-                if visualize_scores:
-                    vis_string_list.append(score_string)
-                if visualize_names:
-                    vis_string_list.append(detection["name"])
-                visualization_utils.draw_bounding_box_on_image(image,top,left,bottom,right,display_str_list=vis_string_list,thickness=1, color=col, use_normalized_coordinates=False)
+            # copy the ground truth annotations to the output folder if there is any ground truth
+            ground_truth = get_ground_truth_annotations(image_path)
+            if ground_truth:
+                # draw ground truth
+                if visualize_groundtruths:
+                    for detection in ground_truth:
+                        [top, left, bottom, right] = detection["bounding_box"]
+                        col = "black"
+                        visualization_utils.draw_bounding_box_on_image(image, top, left, bottom, right,
+                                                                       display_str_list=(), thickness=1, color=col,
+                                                                       use_normalized_coordinates=False)
+
+                ground_truth_out_path = os.path.join(output_folder, os.path.basename(image_path)[:-4] + "_ground_truth.xml")
+                file_utils.save_annotations_to_xml(ground_truth, image_path, ground_truth_out_path)
+
+                # file_utils.save_json_file(ground_truth,ground_truth_out_path)
+
+            for detection in detections:
+                if visualize_predictions:
+                    #TODO: Use a color per class here
+                    col = 'LightCyan'
+                    [top,left,bottom,right] = detection["bounding_box"]
+                    score_string = str('{0:.2f}'.format(detection["score"]))
+                    vis_string_list = []
+                    if visualize_scores:
+                        vis_string_list.append(score_string)
+                    if visualize_names:
+                        vis_string_list.append(detection["name"])
+                    visualization_utils.draw_bounding_box_on_image(image,top,left,bottom,right,display_str_list=vis_string_list,thickness=1, color=col, use_normalized_coordinates=False)
 
 
-        if visualize_groundtruths or visualize_predictions:
-            image_output_path = os.path.join(output_folder, os.path.basename(image_path))
-            image.save(image_output_path)
+            if visualize_groundtruths or visualize_predictions:
+                image_output_path = os.path.join(output_folder, os.path.basename(image_path))
+                image.save(image_output_path)
 
         
 def get_ground_truth_annotations(image_path):
