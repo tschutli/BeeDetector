@@ -5,19 +5,18 @@ Created on Mon May 11 15:55:35 2020
 @author: johan
 """
 
+import tensorflow.compat.v1 as tf
+tf.disable_v2_behavior()
+
 import colorsys
 import os
 from timeit import default_timer as timer
 
 import numpy as np
-from keras import backend as K
-from keras.models import load_model
-from keras.layers import Input
 from PIL import Image, ImageFont, ImageDraw
 #from object_detection.utils import visualization_utils
 from yolo3.model import yolo_eval, yolo_body, tiny_yolo_body
 from yolo3.utils import letterbox_image
-from keras.utils import multi_gpu_model
 from utils import file_utils
 import time
 import progressbar
@@ -74,13 +73,12 @@ def start(trained_model,frame_queue,stop_event):
     print("Quitting prediction Thread")
 
 
-'''
+
 def predict(model_path,images_to_predict,output_folder,classes,visualize_groundtruths=False,visualize_predictions=True,visualize_scores=True,visualize_names=True):
     
     yolo = YOLO(model_path=model_path)
     
     all_images = file_utils.get_all_image_paths_in_folder(images_to_predict)
-    
     for image_path in progressbar.progressbar(all_images):
         
         image = Image.open(image_path)
@@ -99,7 +97,7 @@ def predict(model_path,images_to_predict,output_folder,classes,visualize_groundt
         predictions_out_path = os.path.join(output_folder, os.path.basename(image_path)[:-4] + ".xml")
         file_utils.save_annotations_to_xml(detections, image_path, predictions_out_path)
         
-        
+        '''
         #copy the ground truth annotations to the output folder if there is any ground truth
         ground_truth = get_ground_truth_annotations(image_path)
         if ground_truth:
@@ -129,7 +127,9 @@ def predict(model_path,images_to_predict,output_folder,classes,visualize_groundt
         if visualize_groundtruths or visualize_predictions:
             image_output_path = os.path.join(output_folder, os.path.basename(image_path))
             image.save(image_output_path)
-'''
+        '''
+
+
 
 
 class YOLO(object):
@@ -153,7 +153,7 @@ class YOLO(object):
         self.__dict__.update(kwargs) # and update with user overrides
         self.class_names = self._get_class()
         self.anchors = self._get_anchors()
-        self.sess = K.get_session()
+        self.sess = tf.keras.backend.get_session()
         self.boxes, self.scores, self.classes = self.generate()
 
     def _get_class(self):
@@ -173,10 +173,10 @@ class YOLO(object):
         num_classes = len(self.class_names)
         is_tiny_version = num_anchors==6 # default setting
         try:
-            self.yolo_model = load_model(model_path, compile=False)
+            self.yolo_model = tf.keras.models.load_model(model_path, compile=False)
         except:
-            self.yolo_model = tiny_yolo_body(Input(shape=(None,None,3)), num_anchors//2, num_classes) \
-                if is_tiny_version else yolo_body(Input(shape=(None,None,3)), num_anchors//3, num_classes)
+            self.yolo_model = tiny_yolo_body(tf.keras.layers.Input(shape=(None,None,3)), num_anchors//2, num_classes) \
+                if is_tiny_version else yolo_body(tf.keras.layers.Input(shape=(None,None,3)), num_anchors//3, num_classes)
             self.yolo_model.load_weights(self.model_path) # make sure model, anchors and classes match
         else:
             assert self.yolo_model.layers[-1].output_shape[-1] == \
@@ -197,9 +197,9 @@ class YOLO(object):
         np.random.seed(None)  # Reset seed to default.
 
         # Generate output tensor targets for filtered bounding boxes.
-        self.input_image_shape = K.placeholder(shape=(2, ))
+        self.input_image_shape = tf.keras.backend.placeholder(shape=(2, ))
         if self.gpu_num>=2:
-            self.yolo_model = multi_gpu_model(self.yolo_model, gpus=self.gpu_num)
+            self.yolo_model = tf.keras.utils.multi_gpu_model(self.yolo_model, gpus=self.gpu_num)
         boxes, scores, classes = yolo_eval(self.yolo_model.output, self.anchors,
                 len(self.class_names), self.input_image_shape,
                 score_threshold=self.score, iou_threshold=self.iou)
@@ -228,7 +228,7 @@ class YOLO(object):
             feed_dict={
                 self.yolo_model.input: image_expand,
                 self.input_image_shape: [image_size[1], image_size[0]],
-                K.learning_phase(): 0
+                tf.keras.backend.learning_phase(): 0
             })
         
         return out_boxes,out_scores,out_classes
@@ -257,7 +257,7 @@ class YOLO(object):
             feed_dict={
                 self.yolo_model.input: image_data,
                 self.input_image_shape: [image.size[1], image.size[0]],
-                K.learning_phase(): 0
+                tf.keras.backend.learning_phase(): 0
             })
         
         return out_boxes,out_scores,out_classes
@@ -329,10 +329,8 @@ def get_ground_truth_annotations(image_path):
 if __name__== "__main__":
     
     model_path = constants.color_model_path
-    images_to_predict = constants.project_folder + "/images/train"
-    images_to_predict = "C:/Users/johan/Desktop/analysis/Test4_2.mp4/detected_bees"
-    output_folder = constants.predictions_folder
-    output_folder = "C:/Users/johan/Desktop/test"
+    images_to_predict = "C:/beetracker/result10/buc_01_12_Trim.mp4/detected_bees"
+    output_folder = "C:/beetracker/result11"
     classes = ["green","white","yellow"]
     
-    #predict(model_path,images_to_predict,output_folder,classes)
+    predict(model_path,images_to_predict,output_folder,classes)

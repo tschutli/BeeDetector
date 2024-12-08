@@ -6,7 +6,7 @@ Created on Tue May  5 11:22:33 2020
 """
 
 import numpy as np
-import keras
+import tensorflow.compat.v1.keras as keras
 from utils import file_utils
 from PIL import Image
 import pickle

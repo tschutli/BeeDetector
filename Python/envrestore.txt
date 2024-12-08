@@ -1,0 +1,53 @@
+Documentation of a few things that were relevant in updating the software to be compatible with RTX3090.
+
+There were a number of dependencies from the original software which were not compatible with RTX3090, most notably tensorflow 1.13.1
+
+Therefore the tensorflow dependency was updated to 2.5 and compatibility mode activated in few files.
+
+To setup a working environment with GPU support, the official official instructions from tensorflow were followed. There's a dedicated page for the windows installation: https://www.tensorflow.org/install/source_windows
+
+Additionally, Python 3.9 is used and a few other dependencies updated. To arrive at a working environment, also run the following commands:
+
+pip3 install opencv-python
+conda install progressbar Pillow 
+pip3 install matplotlib
+
+
+Just for future reference, here's the output of the nvidia-smi command on the RTX3090 machine:
+Sun Dec  8 16:30:12 2024
++-----------------------------------------------------------------------------+
+| NVIDIA-SMI 511.65       Driver Version: 511.65       CUDA Version: 11.6     |
+|-------------------------------+----------------------+----------------------+
+| GPU  Name            TCC/WDDM | Bus-Id        Disp.A | Volatile Uncorr. ECC |
+| Fan  Temp  Perf  Pwr:Usage/Cap|         Memory-Usage | GPU-Util  Compute M. |
+|                               |                      |               MIG M. |
+|===============================+======================+======================|
+|   0  NVIDIA GeForce ... WDDM  | 00000000:17:00.0 Off |                  N/A |
+|  0%   32C    P8    14W / 350W |      0MiB / 24576MiB |      0%      Default |
+|                               |                      |                  N/A |
++-------------------------------+----------------------+----------------------+
+|   1  NVIDIA GeForce ... WDDM  | 00000000:65:00.0  On |                  N/A |
+|  0%   32C    P8    21W / 350W |    430MiB / 24576MiB |      3%      Default |
+|                               |                      |                  N/A |
++-------------------------------+----------------------+----------------------+
+
++-----------------------------------------------------------------------------+
+| Processes:                                                                  |
+|  GPU   GI   CI        PID   Type   Process name                  GPU Memory |
+|        ID   ID                                                   Usage      |
+|=============================================================================|
+|    1   N/A  N/A      1096    C+G   C:\windows\System32\dwm.exe     N/A      |
+|    1   N/A  N/A      2756    C+G   ...y\ShellExperienceHost.exe    N/A      |
+|    1   N/A  N/A      4484    C+G   ...icrosoft VS Code\Code.exe    N/A      |
+|    1   N/A  N/A      9632    C+G   ...artMenuExperienceHost.exe    N/A      |
+|    1   N/A  N/A     10340    C+G   C:\windows\explorer.exe         N/A      |
+|    1   N/A  N/A     10880    C+G   ...n\AcPowerNotification.exe    N/A      |
+|    1   N/A  N/A     12824    C+G   ...5n1h2txyewy\SearchApp.exe    N/A      |
+|    1   N/A  N/A     12916    C+G   ...zf8qxf38zg5c\SkypeApp.exe    N/A      |
+|    1   N/A  N/A     14204    C+G   ...2txyewy\TextInputHost.exe    N/A      |
+|    1   N/A  N/A     17364    C+G   ...903.70\msedgewebview2.exe    N/A      |
+|    1   N/A  N/A     18352    C+G   ...ge\Application\msedge.exe    N/A      |
+|    1   N/A  N/A     19860    C+G   ...lPanel\SystemSettings.exe    N/A      |
+|    1   N/A  N/A     20108    C+G   ...wekyb3d8bbwe\Video.UI.exe    N/A      |
+|    1   N/A  N/A     28540    C+G   ...bbwe\Microsoft.Photos.exe    N/A      |
++-----------------------------------------------------------------------------+

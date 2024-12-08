@@ -4,7 +4,8 @@ Created on Sun Apr 19 13:00:29 2020
 
 @author: johan
 """
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
+tf.disable_v2_behavior()
 import numpy as np
 import time
 import statistics

@@ -54,9 +54,9 @@ min_fly_time = 40000
 The following variables define the trained deep learning model paths. Make sure
 to only use forward slashes and NO BACKSLASHES in your paths.
 '''
-bee_model_path = "bee_model"
-hole_model_path = "hole_model"
-color_model_path = "color_model.h5"
-number_model_path = "number_model.h5"
+bee_model_path = "C:/beetracker/software/BeeTrackerDebug/BeeTrackerDebug/bee_model"
+hole_model_path = "C:/beetracker/software/BeeTrackerDebug/BeeTrackerDebug/hole_model"
+color_model_path = "C:/beetracker/software/BeeTrackerDebug/BeeTrackerDebug/color_model.h5"
+number_model_path = "C:/beetracker/software/BeeTrackerDebug/BeeTrackerDebug/number_model.h5"
 
 

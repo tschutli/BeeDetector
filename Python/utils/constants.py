@@ -43,10 +43,10 @@ tensorflow_tile_size = (640,360)
 
 
 '''analyze video parameter'''
-bee_model_path = "C:/Users/johan/Desktop/Agroscope/Models/Bee2/trained_inference_graphs/output_inference_graph_v1.pb/frozen_inference_graph.pb"
-hole_model_path = "C:/Users/johan/Desktop/Agroscope/Models/Holes2/trained_inference_graphs/output_inference_graph_v1.pb/frozen_inference_graph.pb"
-color_model_path = "C:/Users/johan/Desktop/Agroscope/Models/Colors_yolo/trained_model.h5"
-number_model_path = "C:/Users/johan/Desktop/Agroscope/Models/Numbers/trained_model.h5"
+bee_model_path = "C:/beetracker/software/BeeTrackerDebug/BeeTrackerDebug/bee_model"
+hole_model_path = "C:/beetracker/software/BeeTrackerDebug/BeeTrackerDebug/hole_model"
+color_model_path = "C:/beetracker/software/BeeTrackerDebug/BeeTrackerDebug/color_model.h5"
+number_model_path = "C:/beetracker/software/BeeTrackerDebug/BeeTrackerDebug/number_model.h5"
 
 input_videos = [#"D:/inputs/Test5.MP4",
                 #"D:/inputs/Test3.MP4",
