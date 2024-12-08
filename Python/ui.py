@@ -14,6 +14,8 @@ This class uses tkinter to build and handle the UI for the Proprocessing Tool
 @author: johan
 """
 
+import os
+import tensorflow as tf
 
 from tkinter import Checkbutton
 from tkinter import IntVar
@@ -44,7 +46,7 @@ pre_tool = None
 post_tool = None
 
 window_width = 650
-window_height = 800
+window_height = 860
 
 
 
@@ -71,7 +73,7 @@ def pause_analyze_videos(pause_event,progress_callback):
 
 
 
-def start_analyze_videos(videos, results_folder, visualize,pause_event, progress_callback, config_file_path):
+def start_analyze_videos(videos, results_folder, visualize,pause_event, progress_callback, config_file_path, gpu_to_use):
     
     if not os.path.isdir(results_folder):
         messagebox.showerror("Error", "The Results Folder is not a valid folder. Please check the spelling.")
@@ -84,7 +86,11 @@ def start_analyze_videos(videos, results_folder, visualize,pause_event, progress
             messagebox.showerror("Error", "The following video does not exist:\n\n" + video + "\n\nPlease check the spelling")
             return
     
-        
+    if gpu_to_use == "1":
+        os.environ["CUDA_VISIBLE_DEVICES"]="1"
+    if gpu_to_use == "0":
+        os.environ["CUDA_VISIBLE_DEVICES"]="0"
+
     #analyze_video.analyze_videos(constants.bee_model_path, constants.hole_model_path, videos, results_folder, visualize, progress_callback, pause_event)
     global analyze_videos_thread
     my_args=(videos, results_folder, visualize, progress_callback, pause_event,config_file_path)
@@ -119,7 +125,7 @@ def start_ui():
     
     
     
-    description = "Choose a results folder and one or more input videos that should be analyzed. Please separate your input video paths with semicolons! If you enable the 'Visualize Results' option, the program will save the videos to the results folder with all bee detections visualized. Note that by enabling this option, more compute time is needed. The program will analyze all videos and save all results to the results folder. Make sure that there is enough space in the results folder, especially if you enable the 'Visualize Results' option.\n\nShould you wish to pause the program, click the 'Pause' button and wait until the program has paused all computations. This can take up to a few minutes. The computation can later be resumed. Please read the documentation PDF for further information."
+    description = "Choose a results folder and one or more input videos that should be analyzed. Please separate your input video paths with semicolons! If you enable the 'Visualize Results' option, the program will save the videos to the results folder with all bee detections visualized. Note that by enabling this option, more compute time is needed. The program will analyze all videos and save all results to the results folder. Make sure that there is enough space in the results folder, especially if you enable the 'Visualize Results' option.\n\nOptionally, define which GPU should be used for the computations (\"0\" or \"1\").\n\nShould you wish to pause the program, click the 'Pause' button and wait until the program has paused all computations. This can take up to a few minutes. The computation can later be resumed. Please read the documentation PDF for further information."
 
     
     '''Init Tab 1'''
@@ -234,10 +240,16 @@ def start_ui():
     config_file_label = Label(tab1,justify=LEFT, text="Config File (optional): ")
     config_file_label.grid(column=0, row=12, pady=5, padx = 5, columnspan=1, sticky=W)
 
+    gpu_input = Entry(tab1,width=200)
+    gpu_input.grid(column=1, row=13, pady=5, padx = 5, columnspan=2, sticky=W)
+    
+    gpu_input_label = Label(tab1,justify=LEFT, text="GPU (optional): ")
+    gpu_input_label.grid(column=0, row=13, pady=5, padx = 5, columnspan=1, sticky=W)
+
     
     visualize_variable = IntVar()
     check_button = Checkbutton(tab1, text="Visualize Results", variable=visualize_variable)
-    check_button.grid(column=1, row=13, pady=5, padx = 5, columnspan=2, sticky=W)
+    check_button.grid(column=1, row=14, pady=5, padx = 5, columnspan=2, sticky=W)
 
 
     pause_event = Event()
@@ -255,9 +267,9 @@ def start_ui():
         elif progress == "started_stopping_script":
             run_button.configure(text="Please wait...", state="disabled")
         elif progress == "stopped_script":
-            run_button.configure(text="Start", state="normal", command=lambda: start_analyze_videos(convert_paths_list(video_paths_input.get()),output_path_input.get(),visualize_variable.get(),pause_event,progress_callback,config_file_input.get()))
+            run_button.configure(text="Start", state="normal", command=lambda: start_analyze_videos(convert_paths_list(video_paths_input.get()),output_path_input.get(),visualize_variable.get(),pause_event,progress_callback,config_file_input.get(), gpu_input.get()))
         elif progress == "Success. All videos are analyzed!":
-            run_button.configure(text="Start", state="normal", command=lambda: start_analyze_videos(convert_paths_list(video_paths_input.get()),output_path_input.get(),visualize_variable.get(),pause_event,progress_callback,config_file_input.get()))
+            run_button.configure(text="Start", state="normal", command=lambda: start_analyze_videos(convert_paths_list(video_paths_input.get()),output_path_input.get(),visualize_variable.get(),pause_event,progress_callback,config_file_input.get(), gpu_input.get()))
             progress_callback("Success. All videos are analyzed.")
         elif type(progress) == tuple:
             if type(progress[1]) == float:
@@ -289,7 +301,7 @@ def start_ui():
 
     
     
-    run_button.configure(state="normal",command=lambda: start_analyze_videos(convert_paths_list(video_paths_input.get()),output_path_input.get(),visualize_variable.get(),pause_event,progress_callback,config_file_input.get()))
+    run_button.configure(state="normal",command=lambda: start_analyze_videos(convert_paths_list(video_paths_input.get()),output_path_input.get(),visualize_variable.get(),pause_event,progress_callback,config_file_input.get(), gpu_input.get()))
     
     run_button.grid(column=0, row=20, pady=5, padx = 5,columnspan=4, sticky='ew')
     

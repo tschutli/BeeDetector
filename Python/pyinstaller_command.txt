@@ -1,3 +1,7 @@
 with tf_gpu_test environment:
 
 pyinstaller --hidden-import="pkg_resources.py2_warn" --add-data "bee.ico";"." --add-data "opencv_ffmpeg341_64.dll";"." --icon bee.ico --noconsole ui.py
+
+or the below command for the Tensorflow 2.5 version (the cudnn dll files are not included in the repo. please download them (v8.1.0) from the nvidia website: https://developer.nvidia.com/rdp/cudnn-archive#a-collapse811-111)
+
+pyinstaller --hidden-import="pkg_resources.py2_warn" --add-data "bee.ico";"." --add-data "opencv_ffmpeg341_64.dll";"." --add-data "cudnn64_8.dll";"." --add-data "cudnn_ops_infer64_8.dll";"." --add-data "cudnn_ops_train64_8.dll";"." --add-data "cudnn_cnn_infer64_8.dll";"." --icon bee.ico --noconsole ui.py
